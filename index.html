@@ -65,9 +65,21 @@
     <div class="container" id="lobby">
         <h1>🃏 Golpeado Arena 🃏</h1>
         <input type="text" id="username" placeholder="Ingresa tu Nick">
-        <button onclick="createRoom()">Crear Sala Competitiva</button>
+        <button onclick="createRoom()">Crear Sala Multijugador</button>
         <input type="text" id="roomCode" placeholder="Código de Sala">
         <button onclick="joinRoom()">Unirse a Sala</button>
+        
+        <!-- 🔥 EXTENSIÓN PARA DUELOS DE UN SOLO JUGADOR -->
+        <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 20px 0;">
+        <h3 style="margin-top: 5px; color: #ffb703;">🤖 Modo Un Jugador (vs BOT)</h3>
+        <label style="font-size: 13px; color: #ced4da; display: block; margin-bottom: 5px;">Selecciona la dificultad:</label>
+        <select id="botDifficultySelect" style="width: 85%; margin-bottom: 5px;">
+            <option value="easy">Fácil (Para calentar 🟢)</option>
+            <option value="medio">Medio (Estrategia básica 🟡)</option>
+            <option value="dificil">Difícil (Cálculo combinatorio 🔴)</option>
+            <option value="injusto">INJUSTO (Él sabe qué cartas tienes 🔥)</option>
+        </select>
+        <button onclick="startBotGame()" style="background-color: #ffb703; color: black; margin-top: 5px;">Desafiar al BOT ⚡</button>
     </div>
 
     <!-- LOBBY INTERNO -->
@@ -107,7 +119,7 @@
         <div class="players-tracker" id="playersGlobalPanel"></div>
 
         <div class="status-bar">
-            <button onclick="voteKickActive()" id="kickBtn" style="width: auto; padding: 5px 10px; background-color: #d90429; color:white; font-size:12px; margin:0;">🚨 VOTAR EXPULSAR (<span id="kickCount">0</span>)</button>
+            <button onclick="voteKickActive()" id="kickBtn" style="width: auto; padding: 5px 10px; background-color: #d90429; color:white; font-size:12px; margin:0;">🚨 EXPULSAR (<span id="kickCount">0</span>)</button>
             <span id="turnIndicator" style="font-size:13px; font-weight:bold;">Cargando...</span>
             <button onclick="sendKnock()" style="width: auto; padding: 5px 12px; background-color: #ffb703; color:black; font-size:13px; margin:0;">¡GOLPE!</button>
         </div>
@@ -148,14 +160,14 @@
                 <thead><tr><th>Jugador / Cartas</th><th>Puntos</th></tr></thead>
                 <tbody id="modalScoreBody"></tbody>
             </table>
-            <button onclick="returnToLobby()" style="width:100%; margin-top:5px;">Volver al Lobby de Espera ↩️</button>
+            <button onclick="returnToLobby()" style="width:100%; margin-top:5px;">Volver al Menú ↩️</button>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false;
+        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, contraBot = false;
         let selectedCards = [];
         let miPersonaje = null;
         
@@ -165,12 +177,21 @@
         function createRoom() { 
             myName = document.getElementById('username').value.trim(); 
             if (!myName) return alert('⚠️ Ingresa tu nombre.');
+            contraBot = false;
             socket.emit('create_room', { name: myName }); 
         }
         function joinRoom() { 
             myName = document.getElementById('username').value.trim(); 
             const c = document.getElementById('roomCode').value.trim(); 
-            if (myName && c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: myName }); }
+            if (myName && c) { currentRoomId = c; contraBot = false; socket.emit('join_room', { roomId: c, name: myName }); }
+        }
+        // Disparador del modo campaña contra la máquina
+        function startBotGame() {
+            myName = document.getElementById('username').value.trim();
+            const diff = document.getElementById('botDifficultySelect').value;
+            if (!myName) return alert('⚠️ Por favor, ingresa tu nickname antes de desafiar al Bot.');
+            contraBot = true;
+            socket.emit('create_bot_room', { name: myName, difficulty: diff });
         }
         
         function sendSettings() {
@@ -193,7 +214,10 @@
             }
         }
         
-        function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
+        function voteKickActive() { 
+            if(contraBot) return alert("No puedes expulsar al bot, ¡te toca enfrentarlo!");
+            socket.emit('vote_kick_player', currentRoomId); 
+        }
 
         function drawCard(source) {
             if (!miTurno || currentPhase !== 'draw') return;
@@ -270,6 +294,7 @@
         });
 
         socket.on('update_hand', (hand) => {
+            document.getElementById('lobby').classList.add('hidden');
             document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden');
             document.getElementById('gameBoard').classList.remove('hidden');
             const container = document.getElementById('myHand'); container.innerHTML = '';
@@ -283,6 +308,10 @@
             document.getElementById('deckCount').innerText = room.deckCount;
             document.getElementById('kickCount').innerText = room.kickVotes.length;
             currentPhase = room.phase;
+            if(room.botDifficulty) contraBot = true;
+
+            // Ocultar botón vote-kick si estás jugando contra el bot
+            if(contraBot) document.getElementById('kickBtn').classList.add('hidden');
 
             const panel = document.getElementById('playersGlobalPanel'); panel.innerHTML = '';
             room.players.forEach(p => {
@@ -310,7 +339,7 @@
             });
 
             if (room.turnId === socket.id) {
-                document.getElementById('kickBtn').classList.add('hidden');
+                if(!contraBot) document.getElementById('kickBtn').classList.add('hidden');
                 miTurno = true;
                 if (currentPhase === 'draw') {
                     document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Alza carta.";
@@ -320,15 +349,22 @@
                     document.getElementById('helperText').innerText = "Doble toque para tirar, o un toque y selecciona juego para acomodar.";
                 }
             } else {
-                document.getElementById('kickBtn').classList.remove('hidden');
+                if(!contraBot) document.getElementById('kickBtn').classList.remove('hidden');
                 miTurno = false;
                 const active = room.players.find(p => p.id === room.turnId);
-                document.getElementById('turnIndicator').innerText = `Esperando a: ${active ? active.name : 'oponente'}...`;
-                document.getElementById('helperText').innerText = "Mantente atento al flujo visual.";
+                document.getElementById('turnIndicator').innerText = `Pensando: ${active ? active.name : 'oponente'}...`;
+                document.getElementById('helperText').innerText = "Analiza el tablero táctico.";
             }
         });
 
         socket.on('returned_to_lobby', (room) => {
+            if (!room) {
+                // Colapso completo de campaña (regreso al home)
+                document.getElementById('gameBoard').classList.add('hidden');
+                document.getElementById('victoryModal').classList.add('hidden');
+                document.getElementById('lobby').classList.remove('hidden');
+                return;
+            }
             document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden');
             document.getElementById('waitingRoom').classList.remove('hidden'); selectedCards = [];
         });
