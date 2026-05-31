@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golpeado Arena</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #1b4332; color: white; text-align: center; margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: 20px auto; background: #2d6a4f; padding: 25px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+        input, select, button { padding: 12px; margin: 10px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; }
+        input, select { width: 80%; font-weight: normal; background-color: white; color: black; }
+        button { background-color: #52b788; color: #1b4332; cursor: pointer; width: 85%; transition: 0.2s; }
+        button:hover { background-color: #74c69d; transform: scale(1.02); }
+        .hidden { display: none !important; }
+        
+        /* 🎭 CONTROL DE ARQUETIPOS */
+        .char-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
+        .char-btn { background: #40916c; border: 2px solid transparent; border-radius: 10px; padding: 10px; font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .char-btn:hover:not(:disabled) { background: #52b788; transform: translateY(-3px); }
+        .char-btn.my-selection { border-color: #ffb703; background: #ffb703; box-shadow: 0 0 10px #ffb703; }
+        .char-btn:disabled { background: #153124; opacity: 0.3; cursor: not-allowed; }
+
+        .players-tracker { display: flex; justify-content: center; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; }
+        .player-status-card { background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px 15px; min-width: 90px; text-align: center; }
+        .player-status-card.active-turn { border-color: #ffb703; background: rgba(255,183,3,0.15); box-shadow: 0 0 15px rgba(255,183,3,0.4); }
+        .player-avatar-icon { font-size: 26px; }
+        
+        .board { display: flex; flex-direction: column; justify-content: space-between; min-height: 95vh; max-width: 900px; margin: 0 auto; }
+        .mat { display: flex; justify-content: center; gap: 40px; margin: 15px 0; }
+        .deck-slot { width: 75px; height: 110px; border: 2px dashed #74c69d; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: #40916c; }
+        
+        .card { width: 75px; height: 110px; background-color: white; color: black; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; box-sizing: border-box; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer; position: relative; }
+        .card.selected { border: 3px solid #ffb703; transform: translateY(-15px); background-color: #e8f5e9; }
+        .card.hearts, .card.diamonds { color: #d90429; }
+        .card.clubs, .card.spades { color: #2b2d42; }
+        .card.joker { color: #7209b7; background-color: #e0aaff; }
+        
+        .hand-container { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; min-height: 120px; }
+        .status-bar { font-size: 16px; background: #40916c; padding: 10px; border-radius: 8px; display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
+        
+        .table-groups { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin: 10px 0; text-align: left; }
+        .exposed-group { display: inline-flex; background: #153124; padding: 8px; border-radius: 8px; margin: 5px; gap: 4px; border: 1px solid #52b788; cursor: pointer; }
+        
+        .modal-overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: radial-gradient(circle, #2d6a4f 0%, #1b4332 100%); padding: 35px 25px; border-radius: 20px; border: 3px solid #ffb703; width: 90%; max-width: 480px; text-align: center; max-height: 85vh; overflow-y: auto; }
+        .knock-banner { font-size: 45px; font-weight: 900; color: #ffb703; margin: 0; }
+        .score-table { width: 100%; margin: 20px 0; border-collapse: collapse; }
+        .score-table th { border-bottom: 2px solid #52b788; padding: 8px; }
+        .score-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .row-winner { background: rgba(255,183,3,0.2); color: #ffb703; }
+        
+        .mini-card { display: inline-block; background: white; color: black; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 2px; }
+        .mini-card.red { color: #d90429; }
+        .mini-card.black { color: #2b2d42; }
+        .mini-card.jok { color: #7209b7; background: #e0aaff; }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA INICIAL -->
+    <div class="container" id="lobby">
+        <h1>🃏 Golpeado Arena 🃏</h1>
+        <input type="text" id="username" placeholder="Ingresa tu Nick">
+        <button onclick="createRoom()">Crear Sala Competitiva</button>
+        <input type="text" id="roomCode" placeholder="Código de Sala">
+        <button onclick="joinRoom()">Unirse a Sala</button>
+    </div>
+
+    <!-- LOBBY INTERNO CON CONTROLES AVANZADOS -->
+    <div class="container hidden" id="waitingRoom">
+        <h2>Sala de Espera - Código: <span id="displayCode" style="color:#ffb703;">----</span></h2>
+        
+        <!-- CONFIGURACIONES DEL HOST -->
+        <div id="hostSettingsArea" class="hidden" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin:15px 0;">
+            <h4 style="margin:0 0 10px 0; color:#ffb703;">⚙️ Ajustes de Partida (Solo Tú)</h4>
+            <div style="display:flex; justify-content:space-around; font-size:14px;">
+                <div>
+                    <label>Jugadores Máx:</label><br>
+                    <select id="setPlayers" onchange="sendSettings()" style="width:70px; padding:5px; margin:5px 0;"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select>
+                </div>
+                <div>
+                    <label>Comodines (Jokers):</label><br>
+                    <select id="setJokers" onchange="sendSettings()" style="width:70px; padding:5px; margin:5px 0;"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
+                </div>
+            </div>
+        </div>
+
+        <!-- SELECCIÓN DE IDENTIDADES (10 PERSONAJES EXCLUSIVOS) -->
+        <h4 style="margin:15px 0 5px 0; text-align:left; color:#74c69d;">🎭 Elige tu personaje (Único):</h4>
+        <div class="char-grid" id="charactersGrid">
+            <!-- Cargados dinámicamente por JS -->
+        </div>
+
+        <h4 style="margin:10px 0 5px 0; text-align:left;">Jugadores Conectados:</h4>
+        <ul id="playerList" style="list-style:none; padding:0; font-size:18px; text-align:left; line-height:2.2;"></ul>
+        
+        <button id="readyBtn" onclick="toggleReady()" style="background-color:#ffb703; color:black;">MARCAR LISTO 🟢</button>
+        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background-color:#52b788;">INICIAR PARTIDA 🚀</button>
+    </div>
+
+    <!-- TABLERO -->
+    <div class="board hidden" id="gameBoard">
+        <div class="players-tracker" id="playersGlobalPanel"></div>
+
+        <div class="status-bar">
+            <span id="turnIndicator">Cargando...</span>
+            <button onclick="sendKnock()" style="width: auto; padding: 6px 20px; background-color: #ffb703; color:black;">¡GOLPE!</button>
+        </div>
+
+        <div class="table-groups">
+            <h4 style="margin: 0 0 5px 0;">Juegos Abiertos:</h4>
+            <div id="exposedArea"></div>
+        </div>
+
+        <div class="mat">
+            <div>
+                <p style="margin:2px;">Mazo (<span id="deckCount">0</span>)</p>
+                <div class="deck-slot" onclick="drawCard('deck')">MAZO</div>
+            </div>
+            <div>
+                <p style="margin:2px;">Descarte</p>
+                <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
+            </div>
+        </div>
+
+        <div>
+            <h3>Tu Mano</h3>
+            <div class="hand-container" id="myHand"></div>
+            <p id="helperText" style="font-size: 14px; color: #ced4da; margin: 5px;"></p>
+        </div>
+    </div>
+
+    <!-- MODAL FIN DE PARTIDA -->
+    <div class="modal-overlay hidden" id="victoryModal">
+        <div class="modal-content">
+            <h1 class="knock-banner">💥 ¡GOLPE! 💥</h1>
+            <p style="margin: 5px 0 0 0; color:#ced4da; font-size:13px;"><strong id="knockerName" style="color:white;">-</strong> cerró la mesa</p>
+            <h2 id="victoryAlert" style="color:#74c69d; margin:15px 0 5px 0;">Ganador</h2>
+            <table class="score-table">
+                <thead><tr><th>Jugador / Cartas</th><th>Puntos</th></tr></thead>
+                <tbody id="modalScoreBody"></tbody>
+            </table>
+            <!-- REINICIO REGLAMENTARIO -->
+            <button onclick="returnToLobby()" style="width:100%; margin-top:5px;">Volver al Lobby de Espera ↩️</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false;
+        let selectedCards = [];
+        let miPersonaje = null;
+        
+        const characterList = ['🦊', '🦅', '🦁', '🦉', '🐍', '🐺', '🐻', '🐯', '🦏', '🦈'];
+        const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
+
+        function createRoom() { 
+            myName = document.getElementById('username').value.trim(); 
+            if (!myName) return alert('⚠️ Ingresa tu nombre.');
+            socket.emit('create_room', { name: myName }); 
+        }
+        function joinRoom() { 
+            myName = document.getElementById('username').value.trim(); 
+            const c = document.getElementById('roomCode').value.trim(); 
+            if (myName && c) {
+                currentRoomId = c;
+                socket.emit('join_room', { roomId: c, name: myName });
+            }
+        }
+        
+        function sendSettings() {
+            if(!soyHost) return;
+            const maxPlayers = document.getElementById('setPlayers').value;
+            const jokerCount = document.getElementById('setJokers').value;
+            socket.emit('change_settings', { roomId: currentRoomId, maxPlayers, jokerCount });
+        }
+
+        function pickCharacter(char) {
+            socket.emit('select_character', { roomId: currentRoomId, character: char });
+        }
+
+        function toggleReady() {
+            socket.emit('toggle_ready', currentRoomId);
+        }
+
+        function startGame() { socket.emit('start_game', currentRoomId); }
+        function sendKnock() { socket.emit('knock', currentRoomId); }
+        function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
+
+        function drawCard(source) {
+            if (!miTurno || currentPhase !== 'draw') return;
+            if (source === 'discard') {
+                if (document.getElementById('discardSlot').innerText.includes('Vacío')) return alert("⚠️ Pozo vacío.");
+                if (selectedCards.length < 2) return alert("⚠️ Selecciona mínimo 2 cartas asociadas.");
+                socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards });
+                selectedCards = [];
+            } else { socket.emit('draw_card', { roomId: currentRoomId, source: 'deck' }); }
+        }
+
+        function handleCardClick(cardId) {
+            if (!miTurno) return;
+            if (currentPhase === 'draw') {
+                const idx = selectedCards.indexOf(cardId);
+                if (idx > -1) selectedCards.splice(idx, 1);
+                else selectedCards.push(cardId);
+                document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
+            } else if (currentPhase === 'discard') {
+                const idx = selectedCards.indexOf(cardId);
+                if (idx > -1) {
+                    socket.emit('discard', { roomId: currentRoomId, cardId: cardId });
+                    selectedCards = [];
+                } else {
+                    selectedCards = [cardId];
+                    document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
+                }
+            }
+        }
+
+        function plugIn(groupId) {
+            if (!miTurno || selectedCards.length !== 1 || currentPhase !== 'discard') return alert("Selecciona 1 carta para enchufar.");
+            socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] });
+            selectedCards = [];
+        }
+
+        socket.on('room_joined', ({ roomId, isHost }) => {
+            currentRoomId = roomId;
+            soyHost = isHost;
+            document.getElementById('lobby').classList.add('hidden');
+            document.getElementById('waitingRoom').classList.remove('hidden');
+            document.getElementById('displayCode').innerText = roomId;
+            if (isHost) document.getElementById('hostSettingsArea').classList.remove('hidden');
+        });
+
+        // 🎭 RENDERIZADO COMPLETO DEL LOBBY DE ESPERA
+        socket.on('update_lobby', (room) => {
+            // Actualizar selectores si eres el invitado
+            if (!soyHost) {
+                document.getElementById('hostSettingsArea').classList.add('hidden');
+            } else {
+                document.getElementById('setPlayers').value = room.maxPlayers;
+                document.getElementById('setJokers').value = room.jokerCount;
+            }
+
+            // Render del Grid de personajes
+            const grid = document.getElementById('charactersGrid');
+            grid.innerHTML = '';
+            
+            const takenChars = room.players.map(p => p.character).filter(Boolean);
+            const myData = room.players.find(p => p.id === socket.id);
+            miPersonaje = myData ? myData.character : null;
+
+            characterList.forEach(char => {
+                const isMySelection = miPersonaje === char;
+                const isTakenByOther = takenChars.includes(char) && !isMySelection;
+                
+                grid.innerHTML += `
+                    <button class="char-btn ${isMySelection ? 'my-selection' : ''}" 
+                            onclick="pickCharacter('${char}')" 
+                            ${isTakenByOther ? 'disabled' : ''}>
+                        ${char}
+                    </button>
+                `;
+            });
+
+            // Render de la lista de jugadores conectados
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            let totalPlayers = room.players.length;
+            let readyCount = 0;
+
+            room.players.forEach(p => {
+                if (p.ready) readyCount++;
+                list.innerHTML += `
+                    <li>
+                        ${p.character || '❓'} <strong>${p.name}</strong> 
+                        ${p.id === socket.id ? '(Tú)' : ''} 
+                        — ${p.ready ? '🟢 ¡LISTO!' : '❌ Pensando...'}
+                    </li>
+                `;
+            });
+
+            // Control de botón listo
+            const rBtn = document.getElementById('readyBtn');
+            if(myData && myData.ready) {
+                rBtn.innerText = "ESTÁS: ¡LISTO! 🟢";
+                rBtn.style.backgroundColor = "#52b788";
+            } else {
+                rBtn.innerText = "MARCAR LISTO 🔴";
+                rBtn.style.backgroundColor = "#ffb703";
+            }
+
+            // Mostrar botón de inicio solo al host si TODOS están listos
+            if (soyHost && readyCount === totalPlayers && totalPlayers >= 2) {
+                document.getElementById('startBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('startBtn').classList.add('hidden');
+            }
+        });
+
+        socket.on('update_hand', (hand) => {
+            document.getElementById('waitingRoom').classList.add('hidden');
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('gameBoard').classList.remove('hidden');
+            const container = document.getElementById('myHand'); container.innerHTML = '';
+            hand.forEach(c => {
+                const suitClass = c.rank === 'Joker' ? 'joker' : c.suit;
+                container.innerHTML += `
+                    <div class="card ${suitClass}" id="${c.id}" onclick="handleCardClick('${c.id}')">
+                        <div>${c.rank}</div><div style="font-size:22px; text-align:center;">${suitIcons[c.suit]}</div><div style="text-align:right;">${c.rank}</div>
+                    </div>`;
+            });
+        });
+
+        socket.on('update_game', (room) => {
+            document.getElementById('deckCount').innerText = room.deckCount;
+            currentPhase = room.phase;
+
+            const panel = document.getElementById('playersGlobalPanel'); panel.innerHTML = '';
+            room.players.forEach(p => {
+                const isHisTurn = room.turnId === p.id;
+                panel.innerHTML += `
+                    <div class="player-status-card ${isHisTurn ? 'active-turn' : ''}">
+                        <div class="player-avatar-icon">${p.character || '❓'}</div>
+                        <div style="font-size:13px; font-weight:bold; overflow:hidden; text-overflow:ellipsis; max-width:80px; white-space:nowrap;">${p.name}</div>
+                        <div style="font-size:11px; color:#ced4da; margin-top:2px;">🎴 ${p.cardCount} cartas</div>
+                    </div>
+                `;
+            });
+
+            const slot = document.getElementById('discardSlot');
+            if(room.topDiscard) {
+                const c = room.topDiscard; const sClass = c.rank==='Joker'?'joker':c.suit;
+                slot.innerHTML = `<div class="card ${sClass}"><div>${c.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[c.suit]}</div><div></div></div>`;
+            } else { slot.innerHTML = `<div class="deck-slot">Vacío</div>`; }
+
+            const area = document.getElementById('exposedArea'); area.innerHTML = '';
+            room.exposedGroups.forEach(g => {
+                let cardsHTML = '';
+                g.cards.forEach(c => { cardsHTML += `<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-weight:bold; font-size:12px; margin-right:2px;">${c.rank}${suitIcons[c.suit]}</span>`; });
+                area.innerHTML += `<div class="exposed-group" onclick="plugIn('${g.id}')"><div><small style="color:#74c69d;">${g.ownerName}:</small> </div>${cardsHTML}</div>`;
+            });
+
+            if (room.turnId === socket.id) {
+                miTurno = true;
+                if (currentPhase === 'draw') {
+                    document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Alza del Mazo o Descarte.";
+                    document.getElementById('helperText').innerText = "Toca el mazo para juego oculto. O selecciona tus cartas y toca el descarte para bajar juego.";
+                } else if (currentPhase === 'discard') {
+                    document.getElementById('turnIndicator').innerText = "🔵 TU TURNO: Descarta o Enchufa.";
+                    document.getElementById('helperText').innerText = "Da doble toque a una carta para descartarla, o selecciona una y toca un juego de la mesa para enchufarla.";
+                }
+            } else {
+                miTurno = false;
+                const active = room.players.find(p => p.id === room.turnId);
+                document.getElementById('turnIndicator').innerText = `Esperando jugada de ${active ? active.name : 'oponente'}...`;
+                document.getElementById('helperText').innerText = "Analiza las manos de los rivales.";
+            }
+        });
+
+        // ↩️ RETORNO SEGURO SIN RESET DE PÁGINA
+        socket.on('returned_to_lobby', (room) => {
+            document.getElementById('gameBoard').classList.add('hidden');
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('waitingRoom').classList.remove('hidden');
+            selectedCards = [];
+            socket.emit('join_room', { roomId: currentRoomId, name: myName }); // Reingreso al canal limpio
+        });
+
+        socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
+            document.getElementById('knockerName').innerText = knocker;
+            const titleAlert = document.getElementById('victoryAlert');
+            if(wasVolteado) titleAlert.innerHTML = `🔥 ¡VOLTEADA DE PARTIDA! 🔥<br><span style="font-size:15px; color:#ffb703;">${winner} ganó acomodando cartas</span>`;
+            else titleAlert.innerText = `🏆 ¡Ganador: ${winner}! 🏆`;
+
+            const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
+            scores.forEach(s => {
+                const isWinner = s.name === winner;
+                let handHTML = '<div style="margin-top: 4px;">';
+                s.finalHand.forEach(c => {
+                    let col = (c.suit === 'hearts' || c.suit === 'diamonds') ? 'red' : ((c.rank === 'Joker') ? 'jok' : 'black');
+                    handHTML += `<span class="mini-card ${col}">${c.rank}${suitIcons[c.suit]}</span>`;
+                });
+                handHTML += '</div>';
+
+                tbody.innerHTML += `
+                    <tr class="${isWinner ? 'row-winner' : ''}">
+                        <td style="text-align: left; padding: 10px 5px;">
+                            <strong>${s.character || '❓'} ${s.name}</strong> ${isWinner ? '👑' : ''}
+                            ${handHTML}
+                        </td>
+                        <td style="vertical-align: middle; font-size: 18px;"><strong>${s.score}</strong> pts</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('victoryModal').classList.remove('hidden');
+        });
+
+        socket.on('error_msg', (msg) => alert(msg));
+    </script>
+</body>
+</html>
