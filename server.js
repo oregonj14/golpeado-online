@@ -13,7 +13,6 @@ const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-// REGLA: El As (A) ahora vale 10 puntos reglamentarios
 const getCardValue = (rank) => {
     if (['A', 'J', 'Q', 'K'].includes(rank)) return 10;
     if (rank === 'Joker') return 0;
@@ -154,7 +153,7 @@ const canPlugIn = (group, card) => { return isValidMelding([...group, card]); };
 const sanitizeRoom = (room) => {
     return {
         id: room.id,
-        players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered })),
+        players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered, isBot: p.isBot })),
         topDiscard: room.discardPile[room.discardPile.length - 1] || null,
         turnId: room.players[room.turnIndex]?.id,
         deckCount: room.deck.length,
@@ -164,8 +163,179 @@ const sanitizeRoom = (room) => {
         jokerCount: room.jokerCount,
         state: room.state,
         startingPlayerId: room.startingPlayerId,
-        kickVotes: room.kickVotes
+        kickVotes: room.kickVotes,
+        botDifficulty: room.botDifficulty
     };
+};
+
+// 🔥 INTELIGENCIA ARTIFICIAL: CEREBRO LOGÍSTICO COMPLETO DEL BOT
+const executeBotTurn = (roomId) => {
+    const room = rooms[roomId];
+    if (!room || room.state !== 'playing') return;
+    const bot = room.players.find(p => p.isBot);
+    if (!bot || room.players[room.turnIndex].id !== bot.id) return;
+
+    setTimeout(() => {
+        let topDiscard = room.discardPile[room.discardPile.length - 1];
+        let chooseDiscard = false;
+
+        // 1. FASE DE ROBO (DRAW)
+        if (room.phase === 'draw') {
+            if (topDiscard && bot.hand.length >= 2) {
+                if (room.botDifficulty === 'easy') {
+                    chooseDiscard = false; // El fácil ignora la mesa
+                } else if (room.botDifficulty === 'medio') {
+                    // Revisa si forma juego simple directo
+                    for(let i=0; i<bot.hand.length; i++) {
+                        for(let j=i+1; j<bot.hand.length; j++) {
+                            if (isValidMelding([bot.hand[i], bot.hand[j], topDiscard])) {
+                                chooseDiscard = true;
+                                room.discardPile.pop();
+                                bot.hand.push(topDiscard);
+                                room.exposedGroups.push({
+                                    id: 'g_' + Math.random().toString(36).substr(2, 9),
+                                    ownerName: bot.name,
+                                    cards: [bot.hand[i], bot.hand[j], topDiscard]
+                                });
+                                bot.hand = bot.hand.filter(c => c.id !== bot.hand[i].id && c.id !== bot.hand[j].id);
+                                break;
+                            }
+                        }
+                        if (chooseDiscard) break;
+                    }
+                } else {
+                    // DIFICIL e INJUSTO evalúan el impacto matemático real en su puntaje oculto
+                    let currentBest = getOptimalFinalScore(bot.hand, room.exposedGroups);
+                    for(let i=0; i<bot.hand.length; i++) {
+                        for(let j=i+1; j<bot.hand.length; j++) {
+                            if (isValidMelding([bot.hand[i], bot.hand[j], topDiscard])) {
+                                let tempHand = bot.hand.filter(c => c.id !== bot.hand[i].id && c.id !== bot.hand[j].id);
+                                let testScore = getOptimalFinalScore(tempHand, [...room.exposedGroups, {cards: [bot.hand[i], bot.hand[j], topDiscard]}]);
+                                if (testScore < currentBest) {
+                                    chooseDiscard = true;
+                                    room.discardPile.pop();
+                                    room.exposedGroups.push({
+                                        id: 'g_' + Math.random().toString(36).substr(2, 9),
+                                        ownerName: bot.name,
+                                        cards: [bot.hand[i], bot.hand[j], topDiscard]
+                                    });
+                                    bot.hand = tempHand;
+                                    break;
+                                }
+                            }
+                        }
+                        if (chooseDiscard) break;
+                    }
+                }
+            }
+
+            // MODO INJUSTO: Espía el mazo. Si la carta oculta que viene es mejor que el descarte, la prefiere con dolo.
+            if (!chooseDiscard && room.botDifficulty === 'injusto' && room.deck.length > 0) {
+                let nextDeckCard = room.deck[room.deck.length - 1];
+                let currentBest = getOptimalFinalScore(bot.hand, room.exposedGroups);
+                let scoreWithDeck = getOptimalFinalScore([...bot.hand, nextDeckCard], room.exposedGroups);
+                // Si la carta del mazo destruye su puntuación, intentará forzar descarte si fuera al menos útil
+                if (scoreWithDeck >= currentBest && topDiscard && bot.hand.some(c => c.suit === topDiscard.suit)) {
+                    // Estrategia preventiva injusta
+                }
+            }
+
+            if (!chooseDiscard) {
+                if (room.deck.length === 0 && room.discardPile.length > 1) {
+                    const topD = room.discardPile.pop();
+                    room.deck = room.discardPile.sort(() => Math.random() - 0.5);
+                    room.discardPile = [topD];
+                }
+                let card = room.deck.pop();
+                if (card) bot.hand.push(card);
+            }
+            room.phase = 'discard';
+            io.to(roomId).emit('update_game', sanitizeRoom(room));
+        }
+
+        // 2. DETECTOR DE ENCHUFES AUTOMÁTICOS EN MESA (Medio, Difícil e Injusto)
+        if (room.botDifficulty !== 'easy') {
+            let changed = true;
+            while (changed) {
+                changed = false;
+                for (let i = 0; i < bot.hand.length; i++) {
+                    for (let g = 0; g < room.exposedGroups.length; g++) {
+                        if (canPlugIn(room.exposedGroups[g].cards, bot.hand[i])) {
+                            room.exposedGroups[g].cards.push(bot.hand[i]);
+                            bot.hand.splice(i, 1);
+                            changed = true;
+                            break;
+                        }
+                    }
+                    if (changed) break;
+                }
+            }
+        }
+
+        // 3. ANÁLISIS DE GOLPE (KNOCK)
+        let botScore = getOptimalFinalScore(bot.hand, room.exposedGroups);
+        let hasExposed = room.exposedGroups.some(g => g.ownerName === bot.name);
+        let canKnock = hasExposed || hasValidGroup(bot.hand);
+        let wantToKnock = false;
+
+        if (canKnock) {
+            if (room.botDifficulty === 'easy' && botScore === 0) wantToKnock = true;
+            if (room.botDifficulty === 'medio' && botScore < 12) wantToKnock = true;
+            if (room.botDifficulty === 'dificil' && botScore < 6) wantToKnock = true;
+            if (room.botDifficulty === 'injusto') {
+                // El injusto espía la mano física del jugador humano para cerrarle si va ganando por un punto
+                const human = room.players.find(p => !p.isBot);
+                let humanScore = human ? getOptimalFinalScore(human.hand, room.exposedGroups) : 99;
+                if (botScore <= humanScore || botScore === 0) wantToKnock = true;
+            }
+        }
+
+        if (wantToKnock) {
+            const scores = room.players.map(p => {
+                let finalScore = p.surrendered ? getOptimalFinalScore(p.hand, room.exposedGroups) + 20 : getOptimalFinalScore(p.hand, room.exposedGroups);
+                return { name: p.name, score: finalScore, character: p.character, finalHand: p.hand };
+            });
+            scores.sort((a, b) => a.score - b.score);
+            io.to(roomId).emit('game_over', { scores, knocker: bot.name, winner: scores[0].name, wasVolteado: scores[0].name !== bot.name });
+            return;
+        }
+
+        // 4. FASE DE DESCARTE (DISCARD)
+        if (bot.hand.length > 0) {
+            let discardIdx = 0;
+            if (room.botDifficulty === 'easy') {
+                discardIdx = Math.floor(Math.random() * bot.hand.length);
+            } else {
+                // Busca qué descarte minimiza de forma óptima su castigo de puntos en mano
+                let bestScoreAfterDiscard = 999;
+                for (let i = 0; i < bot.hand.length; i++) {
+                    let tempHand = bot.hand.filter((_, idx) => idx !== i);
+                    let score = getOptimalFinalScore(tempHand, room.exposedGroups);
+                    if (score < bestScoreAfterDiscard) {
+                        bestScoreAfterDiscard = score;
+                        discardIdx = i;
+                    }
+                }
+            }
+            const card = bot.hand.splice(discardIdx, 1)[0];
+            room.discardPile.push(card);
+        }
+
+        // CAMBIO DE TURNO PROTEGIDO CON SALTO DE TRABA
+        let attempts = 0;
+        do {
+            room.turnIndex = (room.turnIndex + 1) % room.players.length;
+            attempts++;
+        } while (room.players[room.turnIndex].surrendered && attempts < room.players.length);
+        
+        room.phase = 'draw';
+        room.kickVotes = [];
+        io.to(roomId).emit('update_game', sanitizeRoom(room));
+
+        // Auto-disparador si el siguiente turno vuelve a ser bot (por rendiciones)
+        if (room.players[room.turnIndex].isBot) executeBotTurn(roomId);
+
+    }, 1000);
 };
 
 const nextTurn = (roomId) => {
@@ -181,12 +351,14 @@ const nextTurn = (roomId) => {
     room.phase = 'draw';
     room.kickVotes = []; 
     io.to(roomId).emit('update_game', sanitizeRoom(room));
+
+    // Si al pasar turno le cae a la máquina, se activa su hilo de pensamiento
+    if (room.players[room.turnIndex].isBot) executeBotTurn(roomId);
 };
 
 const forceGameOver = (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
-    
     const scores = room.players.map(p => {
         let finalScore = p.surrendered ? getOptimalFinalScore(p.hand, room.exposedGroups) + 20 : getOptimalFinalScore(p.hand, room.exposedGroups);
         return { name: p.name, score: finalScore, character: p.character, finalHand: p.hand };
@@ -199,14 +371,10 @@ io.on('connection', (socket) => {
     
     socket.on('join_room', ({ roomId, name }) => {
         let room = rooms[roomId];
-        if (!room) {
-            return socket.emit('error_msg', '⚠️ El código de sala no existe o ya expiró.');
-        }
+        if (!room) return socket.emit('error_msg', '⚠️ El código de sala no existe.');
 
         const existingPlayer = room.players.find(p => p.name === name);
-        if (existingPlayer && room.state === 'waiting') {
-            return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso en esta sala.');
-        }
+        if (existingPlayer && room.state === 'waiting') return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso.');
 
         if (existingPlayer && room.state === 'playing') {
             existingPlayer.id = socket.id;
@@ -216,11 +384,9 @@ io.on('connection', (socket) => {
             return io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
 
-        if (room.players.length >= room.maxPlayers) {
-            return socket.emit('error_msg', '⚠️ La sala está llena.');
-        }
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
 
-        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [] });
+        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false });
         socket.join(roomId);
         socket.emit('room_joined', { roomId, isHost: false });
         io.to(roomId).emit('update_lobby', sanitizeRoom(room));
@@ -230,13 +396,43 @@ io.on('connection', (socket) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = {
             id: roomId, 
-            players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [] }],
+            players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false }],
             deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [],
-            maxPlayers: 5, jokerCount: 2, startingPlayerId: socket.id, kickVotes: []
+            maxPlayers: 5, jokerCount: 2, startingPlayerId: socket.id, kickVotes: [], botDifficulty: null
         };
         socket.join(roomId);
         socket.emit('room_joined', { roomId, isHost: true });
         io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId]));
+    });
+
+    // 🔥 NUEVO CONTROL: CREACIÓN INSTANTÁNEA DE SALA VS BOT
+    socket.on('create_bot_room', ({ name, difficulty }) => {
+        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        rooms[roomId] = {
+            id: roomId,
+            players: [
+                { id: socket.id, name, character: '🦊', ready: true, surrendered: false, hand: [], isBot: false },
+                { id: 'bot_player_id', name: `Bot ${difficulty.toUpperCase()}`, character: '🤖', ready: true, surrendered: false, hand: [], isBot: true }
+            ],
+            deck: [], discardPile: [], turnIndex: 0, state: 'playing', phase: 'draw', exposedGroups: [],
+            maxPlayers: 2, jokerCount: 2, startingPlayerId: socket.id, kickVotes: [], botDifficulty: difficulty
+        };
+        
+        socket.join(roomId);
+        socket.emit('room_joined', { roomId, isHost: true });
+        
+        // Inicialización instantánea del mazo y reparto
+        let room = rooms[roomId];
+        room.deck = createDeck(room.jokerCount);
+        room.players.forEach(p => p.hand = room.deck.splice(0, 7));
+        
+        // El jugador humano siempre inicia con 8 cartas en modo bot por comodidad de UX
+        room.turnIndex = 0;
+        room.players[0].hand.push(room.deck.pop());
+        
+        socket.emit('update_hand', room.players[0].hand);
+        room.phase = 'discard';
+        io.to(roomId).emit('update_game', sanitizeRoom(room));
     });
 
     socket.on('change_settings', ({ roomId, maxPlayers, jokerCount, startingPlayerId }) => {
@@ -255,12 +451,8 @@ io.on('connection', (socket) => {
             if (idx > -1) {
                 if (room.state === 'waiting') {
                     room.players.splice(idx, 1);
-                    if (room.players.length === 0) {
-                        delete rooms[roomId];
-                    } else {
-                        if (room.startingPlayerId === socket.id) room.startingPlayerId = room.players[0].id;
-                        io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-                    }
+                    if (room.players.length === 0) delete rooms[roomId];
+                    else io.to(roomId).emit('update_lobby', sanitizeRoom(room));
                 }
                 break;
             }
@@ -295,23 +487,19 @@ io.on('connection', (socket) => {
 
         room.state = 'playing';
         room.deck = createDeck(room.jokerCount);
-        room.discardPile = []; 
-        room.exposedGroups = [];
-        room.kickVotes = [];
+        room.discardPile = []; room.exposedGroups = []; room.kickVotes = [];
 
         room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId);
         if (room.turnIndex === -1) room.turnIndex = 0;
 
-        room.players.forEach((player) => {
-            player.hand = room.deck.splice(0, 7);
-            player.surrendered = false;
-        });
-        
+        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; });
         room.players[room.turnIndex].hand.push(room.deck.pop());
         
-        room.players.forEach(p => io.to(p.id).emit('update_hand', p.hand));
+        room.players.forEach(p => { if(!p.isBot) io.to(p.id).emit('update_hand', p.hand); });
         room.phase = 'discard'; 
         io.to(roomId).emit('update_game', sanitizeRoom(room));
+
+        if (room.players[room.turnIndex].isBot) executeBotTurn(roomId);
     });
 
     socket.on('surrender_hand', (roomId) => {
@@ -327,11 +515,8 @@ io.on('connection', (socket) => {
             if (activePlayers.length <= 1) {
                 forceGameOver(roomId);
             } else {
-                if (room.players[room.turnIndex].id === socket.id) {
-                    nextTurn(roomId);
-                } else {
-                    io.to(roomId).emit('update_game', sanitizeRoom(room));
-                }
+                if (room.players[room.turnIndex].id === socket.id) nextTurn(roomId);
+                else io.to(roomId).emit('update_game', sanitizeRoom(room));
             }
         }
     });
@@ -339,16 +524,15 @@ io.on('connection', (socket) => {
     socket.on('vote_kick_player', (roomId) => {
         const room = rooms[roomId];
         if (!room || room.state !== 'playing') return;
-        
         const activePlayer = room.players[room.turnIndex];
         if (!activePlayer) return;
 
-        if (room.kickVotes.includes(socket.id)) return socket.emit('error_msg', '⚠️ Ya votaste contra este jugador.');
+        if (room.kickVotes.includes(socket.id)) return socket.emit('error_msg', '⚠️ Ya votaste.');
         room.kickVotes.push(socket.id);
 
         const requiredVotes = room.players.length - 1; 
         if (room.kickVotes.length >= requiredVotes) {
-            io.to(roomId).emit('error_msg', `🚨 El jugador ${activePlayer.name} fue expulsado por inactividad.`);
+            io.to(roomId).emit('error_msg', `🚨 Expulsado: ${activePlayer.name}`);
             room.players.splice(room.turnIndex, 1);
             room.kickVotes = [];
             
@@ -359,15 +543,18 @@ io.on('connection', (socket) => {
                 room.turnIndex = room.turnIndex % room.players.length;
                 room.phase = 'draw';
                 io.to(roomId).emit('update_game', sanitizeRoom(room));
+                if (room.players[room.turnIndex].isBot) executeBotTurn(roomId);
             }
-        } else {
-            io.to(roomId).emit('update_game', sanitizeRoom(room));
-        }
+        } else { io.to(roomId).emit('update_game', sanitizeRoom(room)); }
     });
 
     socket.on('request_back_to_lobby', (roomId) => {
         const room = rooms[roomId];
         if (!room) return;
+        if (room.botDifficulty) {
+            // Si es juego de bot, al salir los devolvemos directo al menú principal colapsando la sala
+            return socket.emit('returned_to_lobby', null);
+        }
         room.state = 'waiting';
         room.deck = []; room.discardPile = []; room.exposedGroups = [];
         room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
