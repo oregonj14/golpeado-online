@@ -70,23 +70,21 @@
         <button onclick="joinRoom()">Unirse a Sala</button>
     </div>
 
-    <!-- LOBBY INTERNO CON CONTROLES AVANZADOS -->
+    <!-- LOBBY INTERNO -->
     <div class="container hidden" id="waitingRoom">
         <h2>Sala de Espera - Código: <span id="displayCode" style="color:#ffb703;">----</span></h2>
         
-        <!-- AJUSTES DEL HOST -->
         <div id="hostSettingsArea" class="hidden" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin:15px 0; text-align: left;">
             <h4 style="margin:0 0 10px 0; color:#ffb703; text-align: center;">⚙️ Ajustes de Partida (Solo Creador)</h4>
             <div style="display:flex; justify-content:space-around; font-size:13px; flex-wrap: wrap; gap: 10px;">
                 <div>
                     <label>Jugadores Máx:</label><br>
-                    <select id="setPlayers" onchange="sendSettings()" style="width:65px; padding:5px;"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select>
+                    <select id="setPlayers" onchange="sendSettings()"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select>
                 </div>
                 <div>
                     <label>Comodines:</label><br>
-                    <select id="setJokers" onchange="sendSettings()" style="width:65px; padding:5px;"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
+                    <select id="setJokers" onchange="sendSettings()"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
                 </div>
-                <!-- 🔥 NUEVA MECÁNICA: Elegir quién inicia -->
                 <div>
                     <label>Quién Empieza:</label><br>
                     <select id="setStarter" onchange="sendSettings()" style="width:120px; padding:5px;"></select>
@@ -109,7 +107,6 @@
         <div class="players-tracker" id="playersGlobalPanel"></div>
 
         <div class="status-bar">
-            <!-- 🔥 BOTÓN: Expulsar por inactividad -->
             <button onclick="voteKickActive()" id="kickBtn" style="width: auto; padding: 5px 10px; background-color: #d90429; color:white; font-size:12px; margin:0;">🚨 VOTAR EXPULSAR (<span id="kickCount">0</span>)</button>
             <span id="turnIndicator" style="font-size:13px; font-weight:bold;">Cargando...</span>
             <button onclick="sendKnock()" style="width: auto; padding: 5px 12px; background-color: #ffb703; color:black; font-size:13px; margin:0;">¡GOLPE!</button>
@@ -134,8 +131,7 @@
         <div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>Tu Mano</h3>
-                <!-- 🔥 BOTÓN: Enterrarse voluntariamente -->
-                <button onclick="surrenderHand()" style="width:auto; padding:5px 15px; background-color:#ffb703; color:black; font-size:12px; margin:0;">🪦 ENTERRARSE (RETIRARSE)</button>
+                <button onclick="surrenderHand()" style="width:auto; padding:5px 15px; background-color:#ffb703; color:black; font-size:12px; margin:0;">🪦 ENTERRARSE</button>
             </div>
             <div class="hand-container" id="myHand"></div>
             <p id="helperText" style="font-size: 13px; color: #ced4da; margin: 5px;"></p>
@@ -163,7 +159,7 @@
         let selectedCards = [];
         let miPersonaje = null;
         
-        const characterList = ['🦊', '🦅', '🦁', '🦉', '🐍', '🐺', '🐻', '🐯', '🐼', '🦈']; // Expandido a 10 personajes
+        const characterList = ['🦊', '🦅', '🦁', '🦉', '🐍', '🐺', '🐻', '🐯', '🐼', '🦈']; 
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
 
         function createRoom() { 
@@ -191,14 +187,12 @@
         function sendKnock() { socket.emit('knock', currentRoomId); }
         function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
         
-        // Ejecución de enterrarse
         function surrenderHand() {
             if (confirm("🪦 ¿Seguro que quieres enterrarte? Te retirarás de esta ronda y recibirás una penalización de +20 puntos.")) {
                 socket.emit('surrender_hand', currentRoomId);
             }
         }
         
-        // Ejecución de voto de expulsión
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
         function drawCard(source) {
@@ -239,7 +233,6 @@
         });
 
         socket.on('update_lobby', (room) => {
-            // Actualizar el selector dinámico de quién empieza (Solo Host)
             if (soyHost) {
                 const starterSelect = document.getElementById('setStarter');
                 const savedVal = starterSelect.value || room.startingPlayerId;
@@ -316,7 +309,6 @@
                 area.innerHTML += `<div class="exposed-group" onclick="plugIn('${g.id}')"><div><small style="color:#74c69d;">${g.ownerName}:</small> </div>${cardsHTML}</div>`;
             });
 
-            // Ocultar el botón de expulsión para uno mismo
             if (room.turnId === socket.id) {
                 document.getElementById('kickBtn').classList.add('hidden');
                 miTurno = true;
