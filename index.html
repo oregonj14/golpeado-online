@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Golpeado Arena</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #1b4332; color: white; text-align: center; margin: 0; padding: 10px; }
@@ -27,7 +27,8 @@
         .mat { display: flex; justify-content: center; gap: 40px; margin: 15px 0; }
         .deck-slot { width: 75px; height: 110px; border: 2px dashed #74c69d; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: #40916c; }
         
-        .card { width: 75px; height: 110px; background-color: white; color: black; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; box-sizing: border-box; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer; }
+        .card { width: 75px; height: 110px; background-color: white; color: black; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; box-sizing: border-box; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: grab; touch-action: none; user-select: none; transition: transform 0.1s ease; }
+        .card:active { cursor: grabbing; transform: scale(1.05) translateY(-5px); z-index: 10; }
         .card.selected { border: 3px solid #ffb703; transform: translateY(-15px); background-color: #e8f5e9; }
         .card.hearts, .card.diamonds { color: #d90429; }
         .card.clubs, .card.spades { color: #2b2d42; }
@@ -61,28 +62,14 @@
 </head>
 <body>
 
-    <!-- LOBBY INICIAL -->
     <div class="container" id="lobby">
         <h1>🃏 Golpeado Arena 🃏</h1>
         <input type="text" id="username" placeholder="Ingresa tu Nick">
         <button onclick="createRoom()">Crear Sala Multijugador</button>
         <input type="text" id="roomCode" placeholder="Código de Sala">
         <button onclick="joinRoom()">Unirse a Sala</button>
-        
-        <!-- 🔥 EXTENSIÓN PARA DUELOS DE UN SOLO JUGADOR -->
-        <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 20px 0;">
-        <h3 style="margin-top: 5px; color: #ffb703;">🤖 Modo Un Jugador (vs BOT)</h3>
-        <label style="font-size: 13px; color: #ced4da; display: block; margin-bottom: 5px;">Selecciona la dificultad:</label>
-        <select id="botDifficultySelect" style="width: 85%; margin-bottom: 5px;">
-            <option value="easy">Fácil (Para calentar 🟢)</option>
-            <option value="medio">Medio (Estrategia básica 🟡)</option>
-            <option value="dificil">Difícil (Cálculo combinatorio 🔴)</option>
-            <option value="injusto">INJUSTO (Él sabe qué cartas tienes 🔥)</option>
-        </select>
-        <button onclick="startBotGame()" style="background-color: #ffb703; color: black; margin-top: 5px;">Desafiar al BOT ⚡</button>
     </div>
 
-    <!-- LOBBY INTERNO -->
     <div class="container hidden" id="waitingRoom">
         <h2>Sala de Espera - Código: <span id="displayCode" style="color:#ffb703;">----</span></h2>
         
@@ -104,7 +91,7 @@
             </div>
         </div>
 
-        <h4 style="margin:15px 0 5px 0; text-align:left; color:#74c69d;">🎭 Elige tu personaje (Único):</h4>
+        <h4 style="margin:15px 0 5px 0; text-align:left; color:#74c69d;">🎭 Elige tu personaje:</h4>
         <div class="char-grid" id="charactersGrid"></div>
 
         <h4 style="margin:10px 0 5px 0; text-align:left;">Jugadores Conectados:</h4>
@@ -114,7 +101,6 @@
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background-color:#52b788;">INICIAR PARTIDA 🚀</button>
     </div>
 
-    <!-- TABLERO -->
     <div class="board hidden" id="gameBoard">
         <div class="players-tracker" id="playersGlobalPanel"></div>
 
@@ -150,7 +136,6 @@
         </div>
     </div>
 
-    <!-- MODAL FIN DE PARTIDA -->
     <div class="modal-overlay hidden" id="victoryModal">
         <div class="modal-content">
             <h1 class="knock-banner">💥 FIN DE RONDA 💥</h1>
@@ -167,33 +152,28 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, contraBot = false;
+        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false;
         let selectedCards = [];
         let miPersonaje = null;
-        
+        let draggedElement = null;
+
         const characterList = ['🦊', '🦅', '🦁', '🦉', '🐍', '🐺', '🐻', '🐯', '🐼', '🦈']; 
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
+
+        socket.on('connect', () => { if (currentRoomId && myName) socket.emit('join_room', { roomId: currentRoomId, name: myName }); });
 
         function createRoom() { 
             myName = document.getElementById('username').value.trim(); 
             if (!myName) return alert('⚠️ Ingresa tu nombre.');
-            contraBot = false;
             socket.emit('create_room', { name: myName }); 
         }
+
         function joinRoom() { 
             myName = document.getElementById('username').value.trim(); 
             const c = document.getElementById('roomCode').value.trim(); 
-            if (myName && c) { currentRoomId = c; contraBot = false; socket.emit('join_room', { roomId: c, name: myName }); }
+            if (myName && c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: myName }); }
         }
-        // Disparador del modo campaña contra la máquina
-        function startBotGame() {
-            myName = document.getElementById('username').value.trim();
-            const diff = document.getElementById('botDifficultySelect').value;
-            if (!myName) return alert('⚠️ Por favor, ingresa tu nickname antes de desafiar al Bot.');
-            contraBot = true;
-            socket.emit('create_bot_room', { name: myName, difficulty: diff });
-        }
-        
+
         function sendSettings() {
             if(!soyHost) return;
             const maxPlayers = document.getElementById('setPlayers').value;
@@ -207,17 +187,14 @@
         function startGame() { socket.emit('start_game', currentRoomId); }
         function sendKnock() { socket.emit('knock', currentRoomId); }
         function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
-        
+
         function surrenderHand() {
             if (confirm("🪦 ¿Seguro que quieres enterrarte? Te retirarás de esta ronda y recibirás una penalización de +20 puntos.")) {
                 socket.emit('surrender_hand', currentRoomId);
             }
         }
-        
-        function voteKickActive() { 
-            if(contraBot) return alert("No puedes expulsar al bot, ¡te toca enfrentarlo!");
-            socket.emit('vote_kick_player', currentRoomId); 
-        }
+
+        function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
         function drawCard(source) {
             if (!miTurno || currentPhase !== 'draw') return;
@@ -233,8 +210,7 @@
             if (!miTurno) return;
             if (currentPhase === 'draw') {
                 const idx = selectedCards.indexOf(cardId);
-                if (idx > -1) selectedCards.splice(idx, 1);
-                else selectedCards.push(cardId);
+                if (idx > -1) selectedCards.splice(idx, 1); else selectedCards.push(cardId);
                 document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
             } else if (currentPhase === 'discard') {
                 const idx = selectedCards.indexOf(cardId);
@@ -249,6 +225,40 @@
             selectedCards = [];
         }
 
+        function makeCardDraggable(el) {
+            el.setAttribute('draggable', 'true');
+            el.addEventListener('dragstart', () => { draggedElement = el; el.style.opacity = '0.4'; });
+            el.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (draggedElement && draggedElement !== el) {
+                    const cards = [...document.getElementById('myHand').children];
+                    if (cards.indexOf(draggedElement) < cards.indexOf(el)) el.after(draggedElement); else el.before(draggedElement);
+                }
+            });
+            el.addEventListener('dragend', () => {
+                if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; }
+                const newOrder = [...document.getElementById('myHand').children].map(c => c.id);
+                socket.emit('reorder_hand', { roomId: currentRoomId, newOrder });
+            });
+
+            el.addEventListener('touchstart', () => { draggedElement = el; el.style.opacity = '0.4'; }, { passive: true });
+            el.addEventListener('touchmove', (e) => {
+                if (!draggedElement) return; e.preventDefault();
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.card');
+                if (target && target !== draggedElement && target.parentElement === document.getElementById('myHand')) {
+                    const cards = [...document.getElementById('myHand').children];
+                    if (cards.indexOf(draggedElement) < cards.indexOf(target)) target.after(draggedElement); else target.before(draggedElement);
+                }
+            }, { passive: false });
+
+            el.addEventListener('touchend', () => {
+                if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; }
+                const newOrder = [...document.getElementById('myHand').children].map(c => c.id);
+                socket.emit('reorder_hand', { roomId: currentRoomId, newOrder });
+            });
+        }
+
         socket.on('room_joined', ({ roomId, isHost }) => {
             currentRoomId = roomId; soyHost = isHost;
             document.getElementById('lobby').classList.add('hidden'); document.getElementById('waitingRoom').classList.remove('hidden');
@@ -261,9 +271,7 @@
                 const starterSelect = document.getElementById('setStarter');
                 const savedVal = starterSelect.value || room.startingPlayerId;
                 starterSelect.innerHTML = '';
-                room.players.forEach(p => {
-                    starterSelect.innerHTML += `<option value="${p.id}" ${p.id === savedVal ? 'selected' : ''}>${p.character || ''} ${p.name}</option>`;
-                });
+                room.players.forEach(p => { starterSelect.innerHTML += `<option value="${p.id}" ${p.id === savedVal ? 'selected' : ''}>${p.character || ''} ${p.name}</option>`; });
             }
 
             const grid = document.getElementById('charactersGrid'); grid.innerHTML = '';
@@ -297,10 +305,19 @@
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden');
             document.getElementById('gameBoard').classList.remove('hidden');
+            
             const container = document.getElementById('myHand'); container.innerHTML = '';
+            
             hand.forEach(c => {
                 const suitClass = c.rank === 'Joker' ? 'joker' : c.suit;
-                container.innerHTML += `<div class="card ${suitClass}" id="${c.id}" onclick="handleCardClick('${c.id}')"><div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit]}</div><div style="text-align:right;">${c.rank}</div></div>`;
+                const cardDiv = document.createElement('div');
+                cardDiv.className = `card ${suitClass}`; cardDiv.id = c.id;
+                if(selectedCards.includes(c.id)) cardDiv.classList.add('selected');
+                
+                cardDiv.onclick = () => handleCardClick(c.id);
+                cardDiv.innerHTML = `<div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div style="text-align:right;">${c.rank}</div>`;
+                
+                container.appendChild(cardDiv); makeCardDraggable(cardDiv);
             });
         });
 
@@ -308,10 +325,6 @@
             document.getElementById('deckCount').innerText = room.deckCount;
             document.getElementById('kickCount').innerText = room.kickVotes.length;
             currentPhase = room.phase;
-            if(room.botDifficulty) contraBot = true;
-
-            // Ocultar botón vote-kick si estás jugando contra el bot
-            if(contraBot) document.getElementById('kickBtn').classList.add('hidden');
 
             const panel = document.getElementById('playersGlobalPanel'); panel.innerHTML = '';
             room.players.forEach(p => {
@@ -328,18 +341,17 @@
             const slot = document.getElementById('discardSlot');
             if(room.topDiscard) {
                 const c = room.topDiscard; const sClass = c.rank==='Joker'?'joker':c.suit;
-                slot.innerHTML = `<div class="card ${sClass}"><div>${c.rank}</div><div style="font-size:20px;text-align:center;">${suitIcons[c.suit]}</div><div></div></div>`;
+                slot.innerHTML = `<div class="card ${sClass}"><div>${c.rank}</div><div style="font-size:20px;text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div></div></div>`;
             } else { slot.innerHTML = `<div class="deck-slot">Vacío</div>`; }
 
             const area = document.getElementById('exposedArea'); area.innerHTML = '';
             room.exposedGroups.forEach(g => {
                 let cardsHTML = '';
-                g.cards.forEach(c => { cardsHTML += `<span style="background:white; color:black; padding:1px 4px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:1px;">${c.rank}${suitIcons[c.suit]}</span>`; });
+                g.cards.forEach(c => { cardsHTML += `<span style="background:white; color:black; padding:1px 4px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:1px;">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`; });
                 area.innerHTML += `<div class="exposed-group" onclick="plugIn('${g.id}')"><div><small style="color:#74c69d;">${g.ownerName}:</small> </div>${cardsHTML}</div>`;
             });
 
             if (room.turnId === socket.id) {
-                if(!contraBot) document.getElementById('kickBtn').classList.add('hidden');
                 miTurno = true;
                 if (currentPhase === 'draw') {
                     document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Alza carta.";
@@ -349,7 +361,6 @@
                     document.getElementById('helperText').innerText = "Doble toque para tirar, o un toque y selecciona juego para acomodar.";
                 }
             } else {
-                if(!contraBot) document.getElementById('kickBtn').classList.remove('hidden');
                 miTurno = false;
                 const active = room.players.find(p => p.id === room.turnId);
                 document.getElementById('turnIndicator').innerText = `Pensando: ${active ? active.name : 'oponente'}...`;
@@ -358,15 +369,8 @@
         });
 
         socket.on('returned_to_lobby', (room) => {
-            if (!room) {
-                // Colapso completo de campaña (regreso al home)
-                document.getElementById('gameBoard').classList.add('hidden');
-                document.getElementById('victoryModal').classList.add('hidden');
-                document.getElementById('lobby').classList.remove('hidden');
-                return;
-            }
-            document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden');
-            document.getElementById('waitingRoom').classList.remove('hidden'); selectedCards = [];
+            if (!room) { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); return; }
+            document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('waitingRoom').classList.remove('hidden'); selectedCards = [];
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
@@ -381,7 +385,7 @@
                 let handHTML = '<div style="margin-top: 4px;">';
                 s.finalHand.forEach(c => {
                     let col = (c.suit === 'hearts' || c.suit === 'diamonds') ? 'red' : ((c.rank === 'Joker') ? 'jok' : 'black');
-                    handHTML += `<span class="mini-card ${col}">${c.rank}${suitIcons[c.suit]}</span>`;
+                    handHTML += `<span class="mini-card ${col}">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`;
                 });
                 handHTML += '</div>';
 
