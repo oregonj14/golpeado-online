@@ -13,7 +13,6 @@ const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-// VALORES ACTUALIZADOS: As, 10, J, Q, K valen 10 puntos
 const getCardValue = (rank) => {
     if (['A', '10', 'J', 'Q', 'K'].includes(rank)) return 10;
     if (rank === 'Joker') return 0;
@@ -23,9 +22,7 @@ const getCardValue = (rank) => {
 const createDeck = (jokerCount) => {
     let deck = [];
     suits.forEach(suit => {
-        ranks.forEach(rank => {
-            deck.push({ suit, rank, value: getCardValue(rank), id: `${rank}_${suit}` });
-        });
+        ranks.forEach(rank => { deck.push({ suit, rank, value: getCardValue(rank), id: `${rank}_${suit}` }); });
     });
     for (let i = 1; i <= jokerCount; i++) {
         deck.push({ suit: 'none', rank: 'Joker', value: 0, id: `Joker_${i}_${Date.now()}` });
@@ -33,14 +30,13 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
-// VALIDADOR INTELIGENTE (Incluye grupos puros de Jokers)
+// VALIDADOR INTELIGENTE 
 const isValidMelding = (cards) => {
     if (cards.length < 3) return false;
     let jokers = cards.filter(c => c.rank === 'Joker').length;
     let normals = cards.filter(c => c.rank !== 'Joker');
     
-    // PERMITE GRUPOS PUROS DE JOKERS
-    if (normals.length === 0) return true;
+    if (normals.length === 0) return true; // Permite grupos puros de Jokers
 
     let firstRank = normals[0].rank;
     if (normals.every(c => c.rank === firstRank)) {
@@ -88,22 +84,18 @@ const calculatePoints = (hand) => {
     let points = 0;
     let jokers = hand.filter(c => c.rank === 'Joker').length;
     let normals = hand.filter(c => c.rank !== 'Joker').sort((a, b) => b.value - a.value);
-    // Si quedan jokers sueltos, anulan automáticamente la carta suelta de mayor peso
     normals.forEach(card => {
         if (jokers > 0) { jokers--; } else { points += card.value; }
     });
     return points;
 };
 
-// MOTOR DE OPTIMIZACIÓN DE PUNTOS
 const getOptimalFinalScore = (hand, exposedGroups) => {
     let baseNormals = hand.filter(c => c.rank !== 'Joker');
     let totalJokers = hand.filter(c => c.rank === 'Joker').length;
 
     function evaluate(cards, jokers, tableGroups) {
         let minScore = calculatePoints([...cards, ...Array(jokers).fill({rank:'Joker', value:0})]);
-        
-        // Evaluar armar grupos de Jokers puros
         if (jokers >= 3) minScore = Math.min(minScore, evaluate(cards, jokers - 3, tableGroups));
         if (jokers >= 4) minScore = Math.min(minScore, evaluate(cards, jokers - 4, tableGroups));
 
@@ -138,10 +130,9 @@ const getOptimalFinalScore = (hand, exposedGroups) => {
         for (let i = 0; i < cards.length; i++) {
             for (let g = 0; g < tableGroups.length; g++) {
                 let targetGroup = tableGroups[g];
-                if (isValidMelding([...targetGroup.cards, cards[i]]) && targetGroup.cards.length < 4) {
+                if (targetGroup.cards.length < 4 && isValidMelding([...targetGroup.cards, cards[i]])) {
                     let nextGroups = tableGroups.map((tg, idx) => {
-                        if (idx === g) return { ...tg, cards: [...tg.cards, cards[i]] };
-                        return tg;
+                        if (idx === g) return { ...tg, cards: [...tg.cards, cards[i]] }; return tg;
                     });
                     let rem = cards.filter((_, idx) => idx !== i);
                     minScore = Math.min(minScore, evaluate(rem, jokers, nextGroups));
@@ -153,13 +144,8 @@ const getOptimalFinalScore = (hand, exposedGroups) => {
     return evaluate(baseNormals, totalJokers, exposedGroups);
 };
 
-const hasValidGroup = (hand) => {
-    let initialPoints = calculatePoints(hand);
-    let optimalPoints = getOptimalFinalScore(hand, []);
-    return optimalPoints < initialPoints;
-};
-
-const canPlugIn = (group, card) => { return isValidMelding([...group, card]); };
+const hasValidGroup = (hand) => getOptimalFinalScore(hand, []) < calculatePoints(hand);
+const canPlugIn = (group, card) => isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
     return {
@@ -174,8 +160,7 @@ const nextTurn = (roomId) => {
     if (!room) return;
     let attempts = 0;
     do {
-        room.turnIndex = (room.turnIndex + 1) % room.players.length;
-        attempts++;
+        room.turnIndex = (room.turnIndex + 1) % room.players.length; attempts++;
     } while (room.players[room.turnIndex].surrendered && attempts < room.players.length);
     room.phase = 'draw'; room.kickVotes = []; 
     io.to(roomId).emit('update_game', sanitizeRoom(room));
@@ -197,24 +182,17 @@ io.on('connection', (socket) => {
     socket.on('join_room', ({ roomId, name }) => {
         let room = rooms[roomId];
         if (!room) return socket.emit('error_msg', '⚠️ El código de sala no existe.');
-
         const existingPlayer = room.players.find(p => p.name === name);
         if (existingPlayer && room.state === 'waiting') return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso.');
-
         if (existingPlayer && room.state === 'playing') {
-            existingPlayer.id = socket.id;
-            socket.join(roomId);
+            existingPlayer.id = socket.id; socket.join(roomId);
             socket.emit('room_joined', { roomId, isHost: (room.players[0].name === name) });
-            socket.emit('update_hand', existingPlayer.hand);
-            return io.to(roomId).emit('update_game', sanitizeRoom(room));
+            socket.emit('update_hand', existingPlayer.hand); return io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
-
         if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
 
         room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false });
-        socket.join(roomId);
-        socket.emit('room_joined', { roomId, isHost: false });
-        io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+        socket.join(roomId); socket.emit('room_joined', { roomId, isHost: false }); io.to(roomId).emit('update_lobby', sanitizeRoom(room));
     });
 
     socket.on('create_room', ({ name }) => {
@@ -224,8 +202,7 @@ io.on('connection', (socket) => {
             deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [],
             maxPlayers: 5, jokerCount: 2, startingPlayerId: socket.id, kickVotes: [], botDifficulty: null
         };
-        socket.join(roomId); socket.emit('room_joined', { roomId, isHost: true });
-        io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId]));
+        socket.join(roomId); socket.emit('room_joined', { roomId, isHost: true }); io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId]));
     });
 
     socket.on('change_settings', ({ roomId, maxPlayers, jokerCount, startingPlayerId }) => {
@@ -244,8 +221,7 @@ io.on('connection', (socket) => {
                     room.players.splice(idx, 1);
                     if (room.players.length === 0) delete rooms[roomId];
                     else io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-                }
-                break;
+                } break;
             }
         }
     });
@@ -279,11 +255,10 @@ io.on('connection', (socket) => {
         if (room.turnIndex === -1) room.turnIndex = 0;
 
         room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; });
-        room.players[room.turnIndex].hand.push(room.deck.pop()); // Primer jugador arranca con 8
+        room.players[room.turnIndex].hand.push(room.deck.pop()); 
         
         room.players.forEach(p => { if(!p.isBot) io.to(p.id).emit('update_hand', p.hand); });
-        room.phase = 'discard'; 
-        io.to(roomId).emit('update_game', sanitizeRoom(room));
+        room.phase = 'discard'; io.to(roomId).emit('update_game', sanitizeRoom(room));
     });
 
     socket.on('surrender_hand', (roomId) => {
@@ -301,6 +276,10 @@ io.on('connection', (socket) => {
     socket.on('vote_kick_player', (roomId) => {
         const room = rooms[roomId];
         if (!room || room.state !== 'playing') return;
+        
+        // REGLA: Mínimo 3 jugadores para expulsar
+        if (room.players.length < 3) return socket.emit('error_msg', '⚠️ Se requieren al menos 3 jugadores en la mesa para expulsar a alguien.');
+
         const activePlayer = room.players[room.turnIndex];
         if (!activePlayer) return;
 
@@ -401,6 +380,30 @@ io.on('connection', (socket) => {
         }
     });
 
+    // SISTEMA DE DESENCHUFAR (UNPLUG)
+    socket.on('unplug_card', ({ roomId, groupId, cardId }) => {
+        const room = rooms[roomId];
+        const player = room.players.find(p => p.id === socket.id);
+        if (!room || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
+
+        const groupIdx = room.exposedGroups.findIndex(g => g.id === groupId);
+        if (groupIdx === -1) return;
+        const group = room.exposedGroups[groupIdx];
+
+        const cardIdx = group.cards.findIndex(c => c.id === cardId);
+        if (cardIdx > -1) {
+            const card = group.cards.splice(cardIdx, 1)[0];
+            player.hand.push(card); // Devuelve la carta específica a tu mano
+
+            // Si el grupo se rompe (< 3) o queda inválido, te comes todo el grupo a la mano
+            if (group.cards.length < 3 || !isValidMelding(group.cards)) {
+                player.hand.push(...group.cards);
+                room.exposedGroups.splice(groupIdx, 1);
+            }
+            socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
+        }
+    });
+
     socket.on('reorder_hand', ({ roomId, newOrder }) => {
         const room = rooms[roomId];
         if (!room || room.state !== 'playing') return;
@@ -418,10 +421,7 @@ io.on('connection', (socket) => {
         const knocker = room.players.find(p => p.id === socket.id);
         if (!room || room.players[room.turnIndex].id !== socket.id) return;
 
-        // REGLA ESTRICTA: Quien tenga 8 cartas (el que inicia) no puede golpear hasta botar una.
-        if (knocker.hand.length === 8) {
-            return socket.emit('error_msg', '⚠️ No puedes golpear con 8 cartas. Primero debes descartar tu carta a la mesa.');
-        }
+        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ No puedes golpear con 8 cartas. Primero debes descartar tu carta a la mesa.');
 
         let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
         let hasInHand = hasValidGroup(knocker.hand);
@@ -436,6 +436,22 @@ io.on('connection', (socket) => {
         const winner = scores[0];
         io.to(roomId).emit('game_over', { scores, knocker: knocker.name, winner: winner.name, wasVolteado: winner.name !== knocker.name });
     });
+
+    // SISTEMA DE CHAT Y BURLAS
+    socket.on('send_chat', ({ roomId, msg }) => {
+        const room = rooms[roomId];
+        const player = room.players.find(p => p.id === socket.id);
+        if (room && player) io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character });
+    });
+
+    socket.on('taunt_card', ({ roomId, cardId }) => {
+        const room = rooms[roomId];
+        const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player) return;
+        const card = player.hand.find(c => c.id === cardId);
+        if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
+    });
+
 });
 
 const PORT = process.env.PORT || 3000;
