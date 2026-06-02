@@ -30,13 +30,12 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
-// VALIDADOR INTELIGENTE 
 const isValidMelding = (cards) => {
     if (cards.length < 3) return false;
     let jokers = cards.filter(c => c.rank === 'Joker').length;
     let normals = cards.filter(c => c.rank !== 'Joker');
     
-    if (normals.length === 0) return true; // Permite grupos puros de Jokers
+    if (normals.length === 0) return true;
 
     let firstRank = normals[0].rank;
     if (normals.every(c => c.rank === firstRank)) {
@@ -178,7 +177,6 @@ const forceGameOver = (roomId) => {
 };
 
 io.on('connection', (socket) => {
-    
     socket.on('join_room', ({ roomId, name }) => {
         let room = rooms[roomId];
         if (!room) return socket.emit('error_msg', '⚠️ El código de sala no existe.');
@@ -276,8 +274,6 @@ io.on('connection', (socket) => {
     socket.on('vote_kick_player', (roomId) => {
         const room = rooms[roomId];
         if (!room || room.state !== 'playing') return;
-        
-        // REGLA: Mínimo 3 jugadores para expulsar
         if (room.players.length < 3) return socket.emit('error_msg', '⚠️ Se requieren al menos 3 jugadores en la mesa para expulsar a alguien.');
 
         const activePlayer = room.players[room.turnIndex];
@@ -380,7 +376,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // SISTEMA DE DESENCHUFAR (UNPLUG)
     socket.on('unplug_card', ({ roomId, groupId, cardId }) => {
         const room = rooms[roomId];
         const player = room.players.find(p => p.id === socket.id);
@@ -393,9 +388,8 @@ io.on('connection', (socket) => {
         const cardIdx = group.cards.findIndex(c => c.id === cardId);
         if (cardIdx > -1) {
             const card = group.cards.splice(cardIdx, 1)[0];
-            player.hand.push(card); // Devuelve la carta específica a tu mano
+            player.hand.push(card);
 
-            // Si el grupo se rompe (< 3) o queda inválido, te comes todo el grupo a la mano
             if (group.cards.length < 3 || !isValidMelding(group.cards)) {
                 player.hand.push(...group.cards);
                 room.exposedGroups.splice(groupIdx, 1);
@@ -437,7 +431,6 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('game_over', { scores, knocker: knocker.name, winner: winner.name, wasVolteado: winner.name !== knocker.name });
     });
 
-    // SISTEMA DE CHAT Y BURLAS
     socket.on('send_chat', ({ roomId, msg }) => {
         const room = rooms[roomId];
         const player = room.players.find(p => p.id === socket.id);
