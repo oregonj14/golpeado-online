@@ -189,14 +189,15 @@ io.on('connection', (socket) => {
         }
         if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
 
-        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false });
+        // Se agregó variables lastMsg, msgCount, mutedUntil para control de spam de chat
+        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false, lastMsg: '', msgCount: 0, mutedUntil: 0 });
         socket.join(roomId); socket.emit('room_joined', { roomId, isHost: false }); io.to(roomId).emit('update_lobby', sanitizeRoom(room));
     });
 
     socket.on('create_room', ({ name }) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = {
-            id: roomId, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false }],
+            id: roomId, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], isBot: false, lastMsg: '', msgCount: 0, mutedUntil: 0 }],
             deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [],
             maxPlayers: 5, jokerCount: 2, startingPlayerId: socket.id, kickVotes: [], botDifficulty: null
         };
@@ -252,7 +253,7 @@ io.on('connection', (socket) => {
         room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId);
         if (room.turnIndex === -1) room.turnIndex = 0;
 
-        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; });
+        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.lastMsg = ''; p.msgCount = 0; p.mutedUntil = 0; });
         room.players[room.turnIndex].hand.push(room.deck.pop()); 
         
         room.players.forEach(p => { if(!p.isBot) io.to(p.id).emit('update_hand', p.hand); });
@@ -431,10 +432,34 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('game_over', { scores, knocker: knocker.name, winner: winner.name, wasVolteado: winner.name !== knocker.name });
     });
 
+    // SISTEMA DE CHAT CON ANTI-SPAM
     socket.on('send_chat', ({ roomId, msg }) => {
         const room = rooms[roomId];
+        if (!room) return;
         const player = room.players.find(p => p.id === socket.id);
-        if (room && player) io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character });
+        if (!player) return;
+
+        // Comprobar Mute
+        if (Date.now() < player.mutedUntil) {
+            const left = Math.ceil((player.mutedUntil - Date.now()) / 1000);
+            return socket.emit('error_msg', `🔇 Estás silenciado. Espera ${left}s.`);
+        }
+
+        // Lógica Anti-Spam (misma palabra > 4 veces)
+        if (player.lastMsg === msg) {
+            player.msgCount++;
+        } else {
+            player.lastMsg = msg;
+            player.msgCount = 1;
+        }
+
+        if (player.msgCount >= 5) {
+            player.mutedUntil = Date.now() + 10000; // 10 segundos
+            player.msgCount = 0;
+            return socket.emit('error_msg', '🚫 Has sido silenciado por 10 segundos por hacer spam.');
+        }
+
+        io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character });
     });
 
     socket.on('taunt_card', ({ roomId, cardId }) => {
