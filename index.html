@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Golpeado: Saloon Edition</title>
-    <!-- Fuente estilo Western -->
     <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
     <style>
+        /* Uso de 100dvh para evitar recortes en celulares modernos */
         body { 
             font-family: 'Segoe UI', Arial, sans-serif; 
-            background: linear-gradient(135deg, #3d2314 0%, #1a0f08 100%); /* Madera oscura de fondo */
-            color: white; text-align: center; margin: 0; padding: 0; height: 100vh; overflow: hidden;
+            background: linear-gradient(135deg, #3d2314 0%, #1a0f08 100%);
+            color: white; text-align: center; margin: 0; padding: 0; 
+            height: 100vh; height: 100dvh; overflow: hidden;
         }
         
-        .western-title { font-family: 'Rye', cursive; color: #f1c40f; text-shadow: 2px 2px 5px black; font-size: 2.5rem; margin: 10px 0;}
+        .western-title { font-family: 'Rye', cursive; color: #f1c40f; text-shadow: 2px 2px 5px black; font-size: 2.2rem; margin: 10px 0;}
         
         .container { max-width: 600px; margin: 5vh auto; background: rgba(0,0,0,0.6); padding: 25px; border-radius: 15px; border: 2px solid #8e44ad; box-shadow: 0 8px 25px rgba(0,0,0,0.8); }
         input, select, button { padding: 10px; margin: 8px 0; border: none; border-radius: 5px; font-size: 15px; font-weight: bold; }
@@ -27,72 +28,83 @@
         .char-btn.my-selection { border-color: #f1c40f; background: #c0392b; box-shadow: 0 0 15px #f1c40f; }
 
         /* MESA TIPO GOVERNOR OF POKER */
-        .board { display: flex; flex-direction: column; justify-content: space-between; height: 100vh; position: relative; }
+        .board { display: flex; flex-direction: column; justify-content: space-between; height: 100dvh; position: relative; overflow: hidden; }
         
         .poker-table {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 800px; height: 50vh;
+            position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+            width: 95%; max-width: 800px; height: 42vh;
             background: radial-gradient(ellipse at center, #2e5c36 0%, #153a1d 100%);
-            border: 20px solid #5c3a21; border-radius: 50%; /* Ovalada */
+            border: 15px solid #5c3a21; border-radius: 50%; 
             box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 15px 40px rgba(0,0,0,0.9);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 1;
         }
 
-        .mat { display: flex; justify-content: center; gap: 30px; }
-        .deck-slot { width: 65px; height: 95px; border: 2px dashed #f1c40f; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: rgba(0,0,0,0.3); color: #f1c40f; }
+        .mat { display: flex; justify-content: center; gap: 20px; }
+        .deck-slot { width: 60px; height: 90px; border: 2px dashed #f1c40f; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: rgba(0,0,0,0.3); color: #f1c40f; }
         
         .card { 
-            width: 65px; height: 95px; background-color: white; color: black; border-radius: 6px; 
+            width: 60px; height: 90px; background-color: white; color: black; border-radius: 6px; 
             display: flex; flex-direction: column; justify-content: space-between; padding: 4px; box-sizing: border-box; 
             font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: grab; touch-action: none; user-select: none; transition: transform 0.1s ease; 
         }
         .card:active { cursor: grabbing; transform: scale(1.05) translateY(-5px); z-index: 10; }
-        .card.selected { border: 3px solid #f1c40f; transform: translateY(-15px); background-color: #fffae6; box-shadow: 0 0 15px #f1c40f; }
+        .card.selected { border: 3px solid #f1c40f; transform: translateY(-10px); background-color: #fffae6; box-shadow: 0 0 15px #f1c40f; }
         .card.hearts, .card.diamonds { color: #c0392b; }
         .card.clubs, .card.spades { color: #2c3e50; }
         .card.joker { color: #8e44ad; background: linear-gradient(135deg, #e0aaff, #fff); }
 
-        .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; max-width: 80%; }
+        .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 15px; max-width: 85%; max-height: 15vh; overflow-y: auto; }
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 6px; border: 1px solid #f1c40f; cursor: pointer; }
         
-        /* AVATARES ALREDEDOR DE LA MESA */
-        .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 2; }
+        /* AVATARES ALREDEDOR DE LA MESA (Solo oponentes) */
+        .opponents-container { position: absolute; width: 100%; height: 75vh; top: 0; left: 0; pointer-events: none; z-index: 2; }
         .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
-        .avatar-icon { font-size: 35px; background: #c0392b; border: 3px solid #f1c40f; border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
+        .avatar-icon { font-size: 30px; background: #c0392b; border: 3px solid #f1c40f; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
         .avatar-seat.active-turn .avatar-icon { background: #f1c40f; border-color: white; box-shadow: 0 0 20px #f1c40f; animation: pulse 1.5s infinite; }
-        .avatar-name { background: rgba(0,0,0,0.8); padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-top: -10px; border: 1px solid #5c3a21; white-space: nowrap; }
+        .avatar-name { background: rgba(0,0,0,0.8); padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-top: -8px; border: 1px solid #5c3a21; white-space: nowrap; }
         .avatar-cards { font-size: 11px; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.7); padding: 2px 5px; border-radius: 5px; margin-top: 2px; }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         /* BURLA POPUP ANIMATION */
-        .taunt-popup { position: absolute; top: -100px; left: 50%; transform: translateX(-50%); z-index: 100; animation: popUpTaunt 3s forwards; pointer-events: none; }
+        .taunt-popup { position: absolute; top: -110px; left: 50%; transform: translateX(-50%); z-index: 100; animation: popUpTaunt 3s forwards; pointer-events: none; }
         @keyframes popUpTaunt { 0% { opacity: 0; transform: translate(-50%, 20px); } 15% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
 
-        /* PANEL INFERIOR (TU MANO) */
-        .bottom-panel { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #1a0f08, transparent); padding-bottom: 10px; z-index: 5; display: flex; flex-direction: column; align-items: center; }
-        .status-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 20px; border: 1px solid #5c3a21; width: 95%; max-width: 600px; }
-        .status-bar button { margin: 0; width: auto; padding: 5px 12px; font-size: 12px; }
-        .hand-container { display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; padding: 10px; min-height: 105px; width: 100%; }
+        /* PANEL INFERIOR (TU MANO Y TU AVATAR) */
+        .bottom-panel { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #1a0f08 70%, transparent); padding-bottom: 5px; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .status-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 5px; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 20px; border: 1px solid #5c3a21; width: 95%; max-width: 600px; z-index: 6;}
+        .status-bar button { margin: 0; width: auto; padding: 5px 10px; font-size: 12px; }
+        .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 5px; max-height: 22vh; overflow-y: auto; width: 95%; }
 
-        /* PANEL DE CHAT SALOON */
-        #chatBox { position: absolute; left: 10px; top: 10px; width: 220px; background: rgba(61, 35, 20, 0.85); border: 2px solid #5c3a21; border-radius: 8px; z-index: 10; display: flex; flex-direction: column; padding: 5px; }
-        #chatMessages { flex: 1; max-height: 120px; overflow-y: auto; font-size: 11px; text-align: left; margin-bottom: 5px; color: #ecf0f1; }
+        /* PANEL DE CHAT SALOON MEJORADO */
+        #chatBox { position: absolute; left: 10px; top: 10px; width: 250px; background: rgba(61, 35, 20, 0.9); border: 2px solid #5c3a21; border-radius: 8px; z-index: 20; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); }
+        #chatMessages { flex: 1; max-height: 120px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4; }
+        .chat-input-area { display: flex; gap: 5px; margin-bottom: 5px; }
+        .chat-input-area input { flex: 1; padding: 5px; border-radius: 4px; border: 1px solid #aa7f18; font-size: 12px; color: black; background: #ecf0f1; }
+        .chat-input-area button { width: auto; padding: 5px 10px; margin: 0; font-size: 11px; }
         .chat-emotes { display: flex; gap: 5px; justify-content: center; }
-        .emote-btn { background: #2c160b; border: 1px solid #f1c40f; border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; }
+        .emote-btn { background: #2c160b; border: 1px solid #f1c40f; border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; }
+
+        /* TU AVATAR LOCAL aisaldo en la esquina inferior */
+        #localAvatarArea { position: absolute; left: 10px; bottom: 20px; z-index: 10; pointer-events: none; }
 
         @media (max-width: 480px) {
-            .poker-table { height: 40vh; border-width: 10px; top: 35%; }
-            .card, .deck-slot { width: 55px; height: 80px; font-size: 13px; padding: 2px; }
-            #chatBox { width: 160px; top: 5px; left: 5px; }
-            .western-title { font-size: 1.8rem; }
+            .poker-table { height: 35vh; border-width: 8px; top: 35%; width: 98%; }
+            .card, .deck-slot { width: 42px; height: 65px; font-size: 11px; padding: 2px; }
+            #chatBox { width: 190px; top: 5px; left: 5px; }
+            #chatMessages { max-height: 80px; font-size: 10px; }
+            .western-title { font-size: 1.5rem; }
+            .avatar-icon { width: 40px; height: 40px; font-size: 20px; }
+            .status-bar button { font-size: 10px; padding: 4px 8px; }
+            .hand-container { gap: 3px; max-height: 25vh; }
+            .hand-container .card { width: 40px; height: 60px; } /* Cartas más pequeñas en mano celular */
+            #localAvatarArea { left: 5px; bottom: 50px; transform: scale(0.8); } /* Mueve el avatar local un poco para no tapar en pantallas chicas */
         }
     </style>
 </head>
 <body>
 
-    <!-- LOBBY INICIAL -->
     <div class="container" id="lobby">
         <h1 class="western-title">🤠 Saloon Golpeado 🃏</h1>
         <input type="text" id="username" placeholder="Ingresa tu Nick">
@@ -101,12 +113,11 @@
         <button onclick="joinRoom()">Unirse a Mesa</button>
     </div>
 
-    <!-- SALA DE ESPERA -->
     <div class="container hidden" id="waitingRoom">
         <h2 class="western-title">Sala: <span id="displayCode" style="color:#f1c40f;">----</span></h2>
         
         <div id="hostSettingsArea" class="hidden" style="background:rgba(0,0,0,0.5); padding:10px; border-radius:10px; margin:10px 0; border: 1px solid #5c3a21;">
-            <h4 style="margin:0 0 5px 0; color:#f1c40f;">⚙️ Reglas de la Mesa (Host)</h4>
+            <h4 style="margin:0 0 5px 0; color:#f1c40f;">⚙️ Reglas de la Mesa</h4>
             <div style="display:flex; justify-content:space-around; font-size:12px; gap: 5px;">
                 <select id="setPlayers" onchange="sendSettings()"><option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option></select>
                 <select id="setJokers" onchange="sendSettings()"><option value="0">0 Jokers</option><option value="2" selected>2 Jokers</option><option value="4">4 Jokers</option></select>
@@ -123,12 +134,15 @@
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background: linear-gradient(#27ae60, #2ecc71);">REPARTIR CARTAS 🚀</button>
     </div>
 
-    <!-- TABLERO GOVERNOR DE POKER -->
     <div class="board hidden" id="gameBoard">
         
-        <!-- Chat Lateral -->
+        <!-- Chat Lateral Interactivo -->
         <div id="chatBox">
             <div id="chatMessages"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
+                <button onclick="sendTypedChat()">Enviar</button>
+            </div>
             <div class="chat-emotes">
                 <button class="emote-btn" onclick="sendChat('🃏')">🃏</button>
                 <button class="emote-btn" onclick="sendChat('😂')">😂</button>
@@ -137,7 +151,7 @@
             </div>
         </div>
 
-        <!-- Avatares Posicionados Alrededor -->
+        <!-- Avatares Oponentes (Z-index bajo) -->
         <div class="opponents-container" id="opponentsArea"></div>
 
         <!-- Mesa Central -->
@@ -147,11 +161,14 @@
                 <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
             </div>
             <div class="exposed-groups-container" id="exposedArea"></div>
-            <span id="turnIndicator" style="position:absolute; bottom: 10px; font-family:'Rye',cursive; color:#f1c40f; text-shadow:1px 1px 2px black;">Cargando...</span>
+            <span id="turnIndicator" style="position:absolute; bottom: 5px; font-family:'Rye',cursive; color:#f1c40f; text-shadow:1px 1px 2px black; font-size:12px;">Cargando...</span>
         </div>
 
-        <!-- Panel del Jugador Inferior -->
+        <!-- Panel Inferior: Contiene tu Mano y tu Avatar -->
         <div class="bottom-panel">
+            <!-- Tu avatar completamente aislado de la mano para evitar colisión -->
+            <div id="localAvatarArea"></div>
+
             <div class="status-bar">
                 <button onclick="voteKickActive()" style="background: linear-gradient(#c0392b, #900); color:white;">🚨 Expulsar</button>
                 <button onclick="sendKnock()">¡GOLPE!</button>
@@ -159,16 +176,16 @@
                 <button onclick="tauntCard()" style="background: linear-gradient(#8e44ad, #5e3370); color:white;">🃏 Burlar</button>
             </div>
             <div class="hand-container" id="myHand"></div>
-            <p id="helperText" style="font-size: 11px; color: #f1c40f; margin: 0;"></p>
+            <p id="helperText" style="font-size: 11px; color: #f1c40f; margin: 2px 0 5px 0;"></p>
         </div>
     </div>
 
     <!-- MODAL VICTORIA -->
     <div class="container hidden" id="victoryModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:1000; width:80%;">
-        <h1 class="western-title" style="color:#e74c3c;">💥 FIN DE MANO 💥</h1>
+        <h1 class="western-title" style="color:#e74c3c; font-size:1.8rem;">💥 FIN DE MANO 💥</h1>
         <p style="margin:0;"><strong id="knockerName">-</strong></p>
         <h2 id="victoryAlert" style="color:#f1c40f; margin:10px 0;">Ganador</h2>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:13px;" id="modalScoreBody"></table>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px;" id="modalScoreBody"></table>
         <button onclick="returnToLobby()">Volver a la Sala</button>
     </div>
 
@@ -182,6 +199,13 @@
 
         const characterList = ['🤠', '🦊', '🦁', '🐍', '🐺', '🦅', '🦈', '🤖', '💀', '👽']; 
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
+
+        // Bind Enter key para el chat
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('chatInput').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') sendTypedChat();
+            });
+        });
 
         socket.on('connect', () => { if (currentRoomId && myName) socket.emit('join_room', { roomId: currentRoomId, name: myName }); });
 
@@ -215,8 +239,17 @@
         function surrenderHand() { if (confirm("🪦 ¿Retirarse de esta ronda? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
-        // LÓGICA DE CHAT Y BURLA
+        // LÓGICA DE CHAT MEJORADA
         function sendChat(msg) { socket.emit('send_chat', { roomId: currentRoomId, msg }); }
+        
+        function sendTypedChat() {
+            const input = document.getElementById('chatInput');
+            if (input.value.trim() !== '') {
+                sendChat(input.value.trim());
+                input.value = ''; // Limpiar input
+            }
+        }
+
         function tauntCard() {
             if (selectedCards.length === 1) {
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] });
@@ -232,16 +265,15 @@
         });
 
         socket.on('show_taunt', ({ playerId, card }) => {
-            const avatarDiv = document.getElementById(`avatar-${playerId}`) || document.getElementById('myAvatarPosFake');
+            const avatarDiv = document.getElementById(`avatar-${playerId}`);
             if (!avatarDiv) return;
             const popup = document.createElement('div');
             popup.className = 'taunt-popup card ' + (card.rank==='Joker'?'joker':card.suit);
-            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:25px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`;
+            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:20px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`;
             avatarDiv.appendChild(popup);
             setTimeout(() => { popup.remove(); }, 3000);
         });
 
-        // LÓGICA DE CARTAS
         function drawCard(source) {
             if (!miTurno || currentPhase !== 'draw') return;
             if (source === 'discard') {
@@ -265,19 +297,18 @@
             }
         }
 
-        // SISTEMA DE ENCHUFE Y DESENCHUFE INTEGRADO
         function handleGroupClick(groupId) {
             if (!miTurno || currentPhase !== 'discard') return;
-            if (selectedCards.length === 1) { // Si hay carta seleccionada -> Enchufar
+            if (selectedCards.length === 1) { 
                 socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] });
                 selectedCards = [];
             }
         }
 
         function handleUnplug(groupId, cardId, event) {
-            event.stopPropagation(); // Evitar disparar el click del grupo
+            event.stopPropagation();
             if (!miTurno || currentPhase !== 'discard') return;
-            if (selectedCards.length === 0) { // Si NO hay carta seleccionada -> Desenchufar a mano
+            if (selectedCards.length === 0) { 
                 socket.emit('unplug_card', { roomId: currentRoomId, groupId: groupId, cardId: cardId });
             }
         }
@@ -315,23 +346,23 @@
             });
         }
 
-        // Posiciones Matemáticas de Avatares
+        // Posiciones Matemáticas dinámicas para evitar topes
         function getSeatPosition(index, totalOthers) {
             if (totalOthers === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
             if (totalOthers === 2) {
-                if (index === 0) return { top: '25%', left: '10%' };
-                if (index === 1) return { top: '25%', left: '90%', transform: 'translateX(-100%)' };
+                if (index === 0) return { top: '15%', left: '10%' };
+                if (index === 1) return { top: '15%', left: '90%', transform: 'translateX(-100%)' };
             }
             if (totalOthers === 3) {
-                if (index === 0) return { top: '40%', left: '5%' };
+                if (index === 0) return { top: '30%', left: '5%' };
                 if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
-                if (index === 2) return { top: '40%', left: '95%', transform: 'translateX(-100%)' };
+                if (index === 2) return { top: '30%', left: '95%', transform: 'translateX(-100%)' };
             }
             if (totalOthers === 4) {
-                if (index === 0) return { top: '45%', left: '5%' };
-                if (index === 1) return { top: '10%', left: '25%' };
-                if (index === 2) return { top: '10%', left: '75%', transform: 'translateX(-100%)' };
-                if (index === 3) return { top: '45%', left: '95%', transform: 'translateX(-100%)' };
+                if (index === 0) return { top: '35%', left: '5%' };
+                if (index === 1) return { top: '5%', left: '25%' };
+                if (index === 2) return { top: '5%', left: '75%', transform: 'translateX(-100%)' };
+                if (index === 3) return { top: '35%', left: '95%', transform: 'translateX(-100%)' };
             }
             return { top: '0', left: '0' };
         }
@@ -406,7 +437,7 @@
             const myData = room.players.find(p => p.id === socket.id);
             const oppArea = document.getElementById('opponentsArea'); oppArea.innerHTML = '';
 
-            // Dibujar a los oponentes alrededor de la mesa
+            // Dibujar Oponentes (Z-index 2)
             opponents.forEach((p, index) => {
                 const pos = getSeatPosition(index, opponents.length);
                 const isTurn = room.turnId === p.id;
@@ -418,8 +449,17 @@
                     </div>
                 `;
             });
-            // Marcador invisible para tu propio Taunt
-            if(!document.getElementById(`avatar-${socket.id}`)) oppArea.innerHTML += `<div id="avatar-${socket.id}" style="position:absolute; bottom:150px; left:50%; transform:translateX(-50%);"></div>`;
+
+            // Dibujar Tu Avatar (Z-index alto, aislado de las cartas)
+            const localAvatarArea = document.getElementById('localAvatarArea');
+            if (myData) {
+                localAvatarArea.innerHTML = `
+                    <div class="avatar-seat ${room.turnId === socket.id ? 'active-turn' : ''}" id="avatar-${socket.id}" style="position:relative; pointer-events:auto;">
+                        <div class="avatar-icon" style="width:45px; height:45px; font-size:20px;">${myData.surrendered ? '🪦' : (myData.character || '❓')}</div>
+                        <div class="avatar-name" style="font-size:10px; margin-top:-5px;">Tú (${myData.name})</div>
+                    </div>
+                `;
+            }
 
             const slot = document.getElementById('discardSlot');
             if(room.topDiscard) {
