@@ -6,7 +6,6 @@
     <title>Golpeado: Saloon Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
     <style>
-        /* Adaptabilidad Total: Respetar límites y flexbox */
         body { 
             font-family: 'Segoe UI', Arial, sans-serif; 
             background: linear-gradient(135deg, #3d2314 0%, #1a0f08 100%);
@@ -38,7 +37,7 @@
         
         .poker-table-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 40vh;}
         .poker-table {
-            width: 95%; max-width: 800px; height: 80%;
+            width: 90%; max-width: 700px; height: 75%;
             background: radial-gradient(ellipse at center, #2e5c36 0%, #153a1d 100%);
             border: 15px solid #5c3a21; border-radius: 50%; 
             box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 15px 40px rgba(0,0,0,0.9);
@@ -65,10 +64,10 @@
             width: 55px; height: 80px; background-color: white; color: black; border-radius: 6px; 
             display: flex; flex-direction: column; justify-content: space-between; padding: 4px; box-sizing: border-box; 
             font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: grab; touch-action: none; user-select: none; transition: transform 0.1s ease; 
-            position: relative; z-index: 1; /* Z-Index base */
+            position: relative; z-index: 10; 
         }
         .card:hover, .card:active { z-index: 100 !important; cursor: grabbing; transform: scale(1.1) translateY(-10px); }
-        .card.selected { border: 3px solid #f1c40f; transform: translateY(-10px); background-color: #fffae6; box-shadow: 0 0 15px #f1c40f; z-index: 50; }
+        .card.selected { border: 3px solid #f1c40f; transform: translateY(-10px); background-color: #fffae6; box-shadow: 0 0 15px #f1c40f; z-index: 50 !important; }
         .card.hearts, .card.diamonds { color: #c0392b; }
         .card.clubs, .card.spades { color: #2c3e50; }
         .card.joker { color: #8e44ad; background: linear-gradient(135deg, #e0aaff, #fff); }
@@ -76,7 +75,7 @@
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-width: 85%; max-height: 15vh; overflow-y: auto; z-index: 2;}
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 6px; border: 1px solid #f1c40f; cursor: pointer; }
         
-        /* AVATARES ALREDEDOR */
+        /* AVATARES AJUSTADOS MÁS AL CENTRO */
         .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 2; }
         .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .avatar-icon { font-size: 26px; background: #c0392b; border: 2px solid #f1c40f; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
@@ -85,15 +84,6 @@
         .avatar-cards { font-size: 10px; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 5px; margin-top: 2px; }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-
-        /* BURLA POPUP ANIMATION FIJADA: Sube relativo al avatar, no valores absolutos locos */
-        .taunt-popup { position: absolute; top: 0; left: 50%; z-index: 999; animation: popUpTaunt 3s forwards; pointer-events: none; margin-left: -27px; }
-        @keyframes popUpTaunt { 
-            0% { opacity: 0; transform: translateY(0px) scale(0.5); } 
-            15% { opacity: 1; transform: translateY(-60px) scale(1); } 
-            80% { opacity: 1; transform: translateY(-60px) scale(1); } 
-            100% { opacity: 0; transform: translateY(-80px) scale(0.8); } 
-        }
 
         /* PANEL INFERIOR (FLEXBOX PARA EVITAR OVERLAP) */
         .bottom-panel { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; background: linear-gradient(to top, #1a0f08 80%, transparent); padding-bottom: 5px; z-index: 50; }
@@ -106,20 +96,24 @@
         #localAvatarArea .avatar-icon { width: 35px; height: 35px; font-size: 18px; margin: 0; border: none; box-shadow: none; background: transparent;}
         #localAvatarArea .avatar-name { background: none; border: none; padding: 0; font-size: 12px; margin: 0; color: white; font-weight: bold; }
 
-        /* Contenedor de Mano: Permite que las cartas crezcan en Z sin cortarse */
+        /* Contenedor de Mano: Z-Index altisimo */
         .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 10px 5px; min-height: 90px; width: 95%; max-width: 800px; z-index: 60;}
 
-        /* MODO ESPECTADOR BANNER */
         .spectator-banner { background: #d35400; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
 
-        /* PANEL DE CHAT SALOON COLAPSABLE */
-        #chatBox { position: absolute; left: 10px; top: 10px; width: 250px; background: rgba(61, 35, 20, 0.9); border: 2px solid #5c3a21; border-radius: 8px; z-index: 80; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); transition: all 0.3s ease;}
-        .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; }
+        /* PANEL DE CHAT SALOON COLAPSABLE (ESQUINA INFERIOR) */
+        #chatBox { position: absolute; right: 10px; bottom: 10px; width: 250px; background: rgba(61, 35, 20, 0.9); border: 2px solid #5c3a21; border-radius: 8px; z-index: 80; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); transition: all 0.3s ease;}
+        .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; position: relative;}
         .chat-header h4 { margin: 0; font-family: 'Segoe UI', sans-serif;}
         
-        #chatBox.minimized .chat-header { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        #chatBox.minimized #chatMessages, #chatBox.minimized .chat-input-area, #chatBox.minimized .chat-emotes { display: none; }
-        
+        .notification-dot { position: absolute; top: -5px; right: 15px; width: 12px; height: 12px; background: red; border-radius: 50%; box-shadow: 0 0 5px red; }
+
+        /* Forma de Icono Minimizado */
+        #chatBox.minimized { width: 45px; height: 45px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: #d4af37;}
+        #chatBox.minimized::before { content: "💬"; font-size: 20px; }
+        #chatBox.minimized .chat-header h4, #chatBox.minimized #chatToggleIcon, #chatBox.minimized #chatMessages, #chatBox.minimized .chat-input-area, #chatBox.minimized .chat-emotes { display: none; }
+        #chatBox.minimized .notification-dot { right: 0; top: 0; }
+
         #chatMessages { flex: 1; max-height: 120px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4; word-wrap: break-word;}
         .chat-input-area { display: flex; gap: 5px; margin-bottom: 5px; }
         .chat-input-area input { flex: 1; padding: 5px; border-radius: 4px; border: 1px solid #aa7f18; font-size: 12px; color: black; background: #ecf0f1; margin:0;}
@@ -132,7 +126,8 @@
             .poker-table { height: 100%; border-width: 8px; }
             .card, .deck-slot, .card-back { width: 45px; height: 70px; font-size: 11px; padding: 2px; }
             .card-back::after { font-size: 20px; padding: 2px; }
-            #chatBox { width: 200px; top: 5px; left: 5px; }
+            #chatBox { right: 5px; bottom: 5px; width: 220px; }
+            #chatBox.minimized { width: 40px; height: 40px; }
             #chatMessages { max-height: 80px; font-size: 11px; }
             .western-title { font-size: 1.5rem; }
             .avatar-icon { width: 35px; height: 35px; font-size: 18px; }
@@ -166,12 +161,8 @@
                     <option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option>
                 </select>
                 <select id="setJokers" onchange="sendSettings()">
-                    <option value="0">0 Jokers</option>
-                    <option value="1">1 Joker</option>
-                    <option value="2" selected>2 Jokers</option>
-                    <option value="3">3 Jokers</option>
-                    <option value="4">4 Jokers</option>
-                    <option value="5">5 Jokers</option>
+                    <option value="0">0 Jokers</option><option value="1">1 Joker</option><option value="2" selected>2 Jokers</option>
+                    <option value="3">3 Jokers</option><option value="4">4 Jokers</option><option value="5">5 Jokers</option>
                 </select>
                 <select id="setStarter" onchange="sendSettings()"></select>
             </div>
@@ -179,19 +170,54 @@
 
         <h4 style="color:#ecf0f1;">🎭 Elige tu sombrero:</h4>
         <div class="char-grid" id="charactersGrid"></div>
-
         <ul id="playerList" style="list-style:none; padding:0; font-size:14px; text-align:left; line-height:1.8;"></ul>
-        
         <button id="readyBtn" onclick="toggleReady()">MARCAR LISTO</button>
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background: linear-gradient(#27ae60, #2ecc71);">REPARTIR CARTAS 🚀</button>
     </div>
 
     <div class="board hidden" id="gameBoard">
         
-        <div id="chatBox">
-            <div class="chat-header" onclick="toggleChat()">
+        <div class="poker-table-wrapper">
+            <div class="opponents-container" id="opponentsArea"></div>
+            <div class="poker-table">
+                <div class="mat">
+                    <div class="card-back" onclick="drawCard('deck')">
+                        <span id="deckCount" style="font-size:10px; background:rgba(0,0,0,0.8); padding:2px 4px; border-radius:5px; position:absolute; bottom:2px;">0</span>
+                    </div>
+                    <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
+                </div>
+                <div class="exposed-groups-container" id="exposedArea"></div>
+                
+                <div style="position:absolute; bottom: 5px; display:flex; align-items:center; gap: 8px;">
+                    <span id="turnIndicator" style="font-family:'Rye',cursive; color:#f1c40f; text-shadow:1px 1px 2px black; font-size:13px;">Cargando...</span>
+                    <span id="timerDisplay" style="background:red; padding:2px 6px; border-radius:5px; font-weight:bold; font-size:12px; display:none;">⏱️ 30s</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-panel" id="playerControlPanel">
+            <div class="status-container">
+                <div id="localAvatarArea"></div> 
+                <div class="status-bar" id="gameplayButtons">
+                    <button onclick="voteKickActive()" style="background: linear-gradient(#c0392b, #900); color:white;">🚨 Expulsar</button>
+                    <button id="discardKnockBtn" onclick="actionDiscardOrKnock()" style="background: linear-gradient(#f1c40f, #d35400); color:black;">¡GOLPE!</button>
+                    <button onclick="surrenderHand()">🪦 Retirar</button>
+                    <button onclick="tauntCard()" style="background: linear-gradient(#8e44ad, #5e3370); color:white;">🃏 Burlar</button>
+                </div>
+            </div>
+            <p id="helperText" style="font-size: 11px; color: #f1c40f; margin: 0 0 2px 0;"></p>
+            <div class="hand-container" id="myHand"></div>
+        </div>
+
+        <div id="spectatorBanner" class="spectator-banner hidden">
+            👀 Estás de Espectador. Espera a que termine la ronda.
+        </div>
+
+        <div id="chatBox" class="minimized" onclick="expandChat(event)">
+            <div class="chat-header" onclick="toggleChat(event)">
                 <h4>💬 Chat del Saloon</h4>
-                <span id="chatToggleIcon">▼</span>
+                <span id="chatToggleIcon">▲</span>
+                <div id="chatNotif" class="notification-dot hidden"></div>
             </div>
             <div id="chatMessages"></div>
             <div class="chat-input-area">
@@ -204,38 +230,6 @@
                 <button class="emote-btn" onclick="sendChat('😡')">😡</button>
                 <button class="emote-btn" onclick="sendChat('🤠')">🤠</button>
             </div>
-        </div>
-
-        <div class="poker-table-wrapper">
-            <div class="opponents-container" id="opponentsArea"></div>
-            <div class="poker-table">
-                <div class="mat">
-                    <div class="card-back" onclick="drawCard('deck')">
-                        <span id="deckCount" style="font-size:10px; background:rgba(0,0,0,0.8); padding:2px 4px; border-radius:5px; position:absolute; bottom:2px;">0</span>
-                    </div>
-                    <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
-                </div>
-                <div class="exposed-groups-container" id="exposedArea"></div>
-                <span id="turnIndicator" style="position:absolute; bottom: 5px; font-family:'Rye',cursive; color:#f1c40f; text-shadow:1px 1px 2px black; font-size:12px;">Cargando...</span>
-            </div>
-        </div>
-
-        <div class="bottom-panel" id="playerControlPanel">
-            <div class="status-container">
-                <div id="localAvatarArea"></div> 
-                <div class="status-bar" id="gameplayButtons">
-                    <button onclick="voteKickActive()" style="background: linear-gradient(#c0392b, #900); color:white;">🚨 Expulsar</button>
-                    <button onclick="sendKnock()">¡GOLPE!</button>
-                    <button onclick="surrenderHand()">🪦 Retirarse</button>
-                    <button onclick="tauntCard()" style="background: linear-gradient(#8e44ad, #5e3370); color:white;">🃏 Burlar</button>
-                </div>
-            </div>
-            <p id="helperText" style="font-size: 11px; color: #f1c40f; margin: 0 0 2px 0;"></p>
-            <div class="hand-container" id="myHand"></div>
-        </div>
-
-        <div id="spectatorBanner" class="spectator-banner hidden">
-            👀 Estás de Espectador. Espera a que termine la ronda para jugar.
         </div>
     </div>
 
@@ -254,9 +248,16 @@
         let selectedCards = [];
         let miPersonaje = null;
         let draggedElement = null;
+        let clockInterval = null;
 
         const characterList = ['🤠', '🦊', '🦁', '🐍', '🐺', '🦅', '🦈', '🤖', '💀', '👽']; 
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
+
+        // Integración de Sonido Preparada
+        function playSound(type) {
+            // Ejemplo: if(type === 'taunt') new Audio('taunt.mp3').play();
+            // Ejemplo: if(type === 'draw') new Audio('draw.mp3').play();
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('chatInput').addEventListener('keypress', function (e) {
@@ -301,33 +302,43 @@
         function joinSpecificRoom(id) {
             myName = document.getElementById('username').value.trim(); 
             if (!myName) return alert('⚠️ Ingresa tu nombre antes de entrar a una sala.');
-            currentRoomId = id; 
-            socket.emit('join_room', { roomId: id, name: myName });
+            currentRoomId = id; socket.emit('join_room', { roomId: id, name: myName });
         }
 
         function sendSettings() {
             if(!soyHost) return;
-            socket.emit('change_settings', { 
-                roomId: currentRoomId, 
-                maxPlayers: document.getElementById('setPlayers').value, 
-                jokerCount: document.getElementById('setJokers').value, 
-                startingPlayerId: document.getElementById('setStarter').value 
-            });
+            socket.emit('change_settings', { roomId: currentRoomId, maxPlayers: document.getElementById('setPlayers').value, jokerCount: document.getElementById('setJokers').value, startingPlayerId: document.getElementById('setStarter').value });
         }
 
         function pickCharacter(char) { socket.emit('select_character', { roomId: currentRoomId, character: char }); }
         function toggleReady() { socket.emit('toggle_ready', currentRoomId); }
         function startGame() { socket.emit('start_game', currentRoomId); }
-        function sendKnock() { socket.emit('knock', currentRoomId); }
-        function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
+        
+        function actionDiscardOrKnock() {
+            // El mismo botón sirve para golpear o descartar según la carta seleccionada
+            if (selectedCards.length === 1 && miTurno && currentPhase === 'discard') {
+                socket.emit('discard', { roomId: currentRoomId, cardId: selectedCards[0] });
+                selectedCards = [];
+            } else {
+                socket.emit('knock', currentRoomId);
+            }
+        }
+        
         function surrenderHand() { if (confirm("🪦 ¿Retirarse de esta ronda? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
-        function toggleChat() {
+        // CHAT (Minimizar como Icono FAB)
+        function expandChat(e) {
             const chatBox = document.getElementById('chatBox');
-            const icon = document.getElementById('chatToggleIcon');
+            if(chatBox.classList.contains('minimized')) {
+                chatBox.classList.remove('minimized');
+                document.getElementById('chatNotif').classList.add('hidden'); // Apagar notificación al abrir
+            }
+        }
+        function toggleChat(e) {
+            e.stopPropagation(); // Evitar que el expandChat se dispare al minimizar
+            const chatBox = document.getElementById('chatBox');
             chatBox.classList.toggle('minimized');
-            icon.innerText = chatBox.classList.contains('minimized') ? '▲' : '▼';
         }
 
         function sendChat(msg) { socket.emit('send_chat', { roomId: currentRoomId, msg }); }
@@ -336,52 +347,83 @@
             if (input.value.trim() !== '') { sendChat(input.value.trim()); input.value = ''; }
         }
 
+        socket.on('chat_msg', ({ sender, msg, character }) => {
+            const chat = document.getElementById('chatMessages');
+            const chatBox = document.getElementById('chatBox');
+            chat.innerHTML += `<div><strong>${character || '❓'} ${sender}:</strong> ${msg}</div>`;
+            chat.scrollTop = chat.scrollHeight;
+
+            // Encender notificación si está minimizado
+            if(chatBox.classList.contains('minimized')) {
+                document.getElementById('chatNotif').classList.remove('hidden');
+            }
+        });
+
+        // BURLA LIBRE (SIN TURNO)
         function tauntCard() {
             if (selectedCards.length === 1) {
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] });
                 document.getElementById('myHand').querySelector('.selected').classList.remove('selected');
                 selectedCards = [];
-            } else { alert("⚠️ Selecciona solo 1 carta de tu mano para mostrarla como burla."); }
+            } else { alert("⚠️ Selecciona 1 carta de tu mano para burlarte."); }
         }
 
-        socket.on('chat_msg', ({ sender, msg, character }) => {
-            const chat = document.getElementById('chatMessages');
-            chat.innerHTML += `<div><strong>${character || '❓'} ${sender}:</strong> ${msg}</div>`;
-            chat.scrollTop = chat.scrollHeight;
-        });
-
-        // BURLA CORREGIDA: Apuntando siempre hacia arriba dentro de su propio contenedor
         socket.on('show_taunt', ({ playerId, card }) => {
             let avatarDiv = document.getElementById(`avatar-${playerId}`);
             if (!avatarDiv && playerId === socket.id && !soyEspectador) avatarDiv = document.getElementById('localAvatarArea');
             if (!avatarDiv) return;
+
             const popup = document.createElement('div');
-            popup.className = 'taunt-popup card ' + (card.rank==='Joker'?'joker':card.suit);
-            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:20px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`;
+            popup.className = 'card ' + (card.rank==='Joker'?'joker':card.suit);
+            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`;
+            popup.style.position = 'absolute'; popup.style.zIndex = '999'; popup.style.pointerEvents = 'none';
+
+            // Matemáticas de Dirección Web API: Va al lado contrario del asiento
+            const rect = avatarDiv.getBoundingClientRect();
+            const centerW = window.innerWidth / 2;
+            let moveX = 0;
+            if (rect.left < centerW - 50) moveX = 70; // Sentado Izquierda -> Burla a la Derecha
+            else if (rect.left > centerW + 50) moveX = -70; // Sentado Derecha -> Burla a la Izquierda
+
             avatarDiv.appendChild(popup);
-            setTimeout(() => { popup.remove(); }, 3000);
+            playSound('taunt');
+
+            popup.animate([
+                { opacity: 0, transform: `translate(0px, 0px) scale(0.5)` },
+                { opacity: 1, transform: `translate(${moveX}px, -70px) scale(1)`, offset: 0.15 },
+                { opacity: 1, transform: `translate(${moveX}px, -70px) scale(1)`, offset: 0.8 },
+                { opacity: 0, transform: `translate(${moveX}px, -90px) scale(0.8)` }
+            ], { duration: 3000, fill: 'forwards' });
+
+            setTimeout(() => popup.remove(), 3000);
         });
 
         function drawCard(source) {
             if (!miTurno || currentPhase !== 'draw' || soyEspectador) return;
             if (source === 'discard') {
                 if (document.getElementById('discardSlot').innerText.includes('Vacío')) return alert("⚠️ Pozo vacío.");
-                if (selectedCards.length < 2) return alert("⚠️ Para robar del pozo debes seleccionar mínimo 2 cartas de tu mano.");
+                if (selectedCards.length < 2) return alert("⚠️ Para robar del pozo debes seleccionar mínimo 2 cartas asociadas de tu mano.");
                 socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards });
                 selectedCards = [];
             } else { socket.emit('draw_card', { roomId: currentRoomId, source: 'deck' }); }
         }
 
+        // SELECCIÓN LIBRE DE CARTAS
         function handleCardClick(cardId) {
-            if (!miTurno || soyEspectador) return;
-            if (currentPhase === 'draw') {
-                const idx = selectedCards.indexOf(cardId);
-                if (idx > -1) selectedCards.splice(idx, 1); else selectedCards.push(cardId);
-                document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
-            } else if (currentPhase === 'discard') {
-                const idx = selectedCards.indexOf(cardId);
-                if (idx > -1) { socket.emit('discard', { roomId: currentRoomId, cardId: cardId }); selectedCards = []; }
-                else { selectedCards = [cardId]; document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id))); }
+            if (soyEspectador) return;
+            const idx = selectedCards.indexOf(cardId);
+            
+            if (idx > -1) selectedCards.splice(idx, 1);
+            else selectedCards.push(cardId);
+            
+            document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
+
+            // Actualizar el botón de acción Dinámico
+            const btn = document.getElementById('discardKnockBtn');
+            if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
+                btn.innerText = "DESGARTAR"; btn.style.background = "linear-gradient(#e67e22, #d35400)";
+            } else {
+                btn.innerText = "¡GOLPE!"; btn.style.background = "linear-gradient(#f1c40f, #d35400)";
             }
         }
 
@@ -389,16 +431,14 @@
             if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
             if (selectedCards.length === 1) { 
                 socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] });
-                selectedCards = [];
+                selectedCards = []; document.getElementById('discardKnockBtn').innerText = "¡GOLPE!";
             }
         }
 
         function handleUnplug(groupId, cardId, event) {
             event.stopPropagation();
             if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 0) { 
-                socket.emit('unplug_card', { roomId: currentRoomId, groupId: groupId, cardId: cardId });
-            }
+            if (selectedCards.length === 0) socket.emit('unplug_card', { roomId: currentRoomId, groupId: groupId, cardId: cardId });
         }
 
         function makeCardDraggable(el) {
@@ -434,23 +474,24 @@
             });
         }
 
+        // Posiciones más ajustadas al centro de la mesa
         function getSeatPosition(index, totalOthers) {
-            if (totalOthers === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
+            if (totalOthers === 1) return { top: '10%', left: '50%', transform: 'translateX(-50%)' };
             if (totalOthers === 2) {
-                if (index === 0) return { top: '20%', left: '5%' };
-                if (index === 1) return { top: '20%', left: '95%', transform: 'translateX(-100%)' };
+                if (index === 0) return { top: '25%', left: '15%' };
+                if (index === 1) return { top: '25%', left: '85%', transform: 'translateX(-100%)' };
             }
             if (totalOthers === 3) {
-                if (index === 0) return { top: '35%', left: '2%' };
+                if (index === 0) return { top: '40%', left: '10%' };
                 if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
-                if (index === 2) return { top: '35%', left: '98%', transform: 'translateX(-100%)' };
+                if (index === 2) return { top: '40%', left: '90%', transform: 'translateX(-100%)' };
             }
             if (totalOthers >= 4) {
-                if (index === 0) return { top: '40%', left: '2%' };
-                if (index === 1) return { top: '5%', left: '25%' };
-                if (index === 2) return { top: '5%', left: '75%', transform: 'translateX(-100%)' };
-                if (index === 3) return { top: '40%', left: '98%', transform: 'translateX(-100%)' };
-                if (index === 4) return { top: '65%', left: '2%' }; // Por si hay 5 oponentes visuales (espectadores u otros)
+                if (index === 0) return { top: '45%', left: '10%' };
+                if (index === 1) return { top: '15%', left: '25%' };
+                if (index === 2) return { top: '15%', left: '75%', transform: 'translateX(-100%)' };
+                if (index === 3) return { top: '45%', left: '90%', transform: 'translateX(-100%)' };
+                if (index === 4) return { top: '65%', left: '10%' }; 
             }
             return { top: '0', left: '0' };
         }
@@ -464,7 +505,6 @@
                 document.getElementById('displayCode').innerText = roomId;
                 if (isHost) document.getElementById('hostSettingsArea').classList.remove('hidden');
             } else {
-                // Configurar UI modo espectador
                 document.getElementById('playerControlPanel').classList.add('hidden');
                 document.getElementById('spectatorBanner').classList.remove('hidden');
             }
@@ -526,6 +566,7 @@
             });
         });
 
+        // ACTUALIZACIÓN DEL TABLERO EN VIVO
         socket.on('update_game', (room) => {
             if (soyEspectador) {
                 document.getElementById('lobby').classList.add('hidden');
@@ -536,11 +577,22 @@
             document.getElementById('deckCount').innerText = room.deckCount;
             currentPhase = room.phase;
 
+            // Gestión del Temporizador Visual
+            const timerEl = document.getElementById('timerDisplay');
+            if (room.timerExpires) {
+                timerEl.style.display = 'inline-block';
+                clearInterval(clockInterval);
+                clockInterval = setInterval(() => {
+                    let left = Math.max(0, Math.ceil((room.timerExpires - Date.now()) / 1000));
+                    timerEl.innerText = `⏱️ ${left}s`;
+                    if (left === 0) clearInterval(clockInterval);
+                }, 1000);
+            } else { timerEl.style.display = 'none'; clearInterval(clockInterval); }
+
             const opponents = room.players.filter(p => p.id !== socket.id);
             const myData = room.players.find(p => p.id === socket.id);
             const oppArea = document.getElementById('opponentsArea'); oppArea.innerHTML = '';
 
-            // Dibujar Oponentes (Z-index 2)
             opponents.forEach((p, index) => {
                 const pos = getSeatPosition(index, opponents.length);
                 const isTurn = room.turnId === p.id;
@@ -553,7 +605,6 @@
                 `;
             });
 
-            // Dibujar Tu Avatar
             if (!soyEspectador && myData) {
                 const localAvatarArea = document.getElementById('localAvatarArea');
                 localAvatarArea.innerHTML = `
@@ -582,17 +633,17 @@
                 if (room.turnId === socket.id) {
                     miTurno = true;
                     if (currentPhase === 'draw') {
-                        document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Roba carta de la mesa.";
-                        document.getElementById('helperText').innerText = "Toca el MAZO o selecciona grupos y toca el DESCARTE.";
+                        document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Roba carta";
+                        document.getElementById('helperText').innerText = "Toca Mazo o selecciona combinaciones y toca Descarte.";
                     } else if (currentPhase === 'discard') {
-                        document.getElementById('turnIndicator').innerText = "🔵 TU TURNO: Baja juegos o Descarta.";
-                        document.getElementById('helperText').innerText = "Un toque para ENCHUFAR. Si NO seleccionas carta, tocas mesa para DESENCHUFAR.";
+                        document.getElementById('turnIndicator').innerText = "🔵 TU TURNO: Acomoda o Descarta";
+                        document.getElementById('helperText').innerText = "Un toque para Enchufar, Desenchufar. Toca tu carta y luego Descarta.";
                     }
                 } else {
                     miTurno = false;
                     const active = room.players.find(p => p.id === room.turnId);
-                    document.getElementById('turnIndicator').innerText = `Pensando: ${active ? active.name : 'oponente'}...`;
-                    document.getElementById('helperText').innerText = "Analizando el tablero...";
+                    document.getElementById('turnIndicator').innerText = `Turno de: ${active ? active.name : '...'}`;
+                    document.getElementById('helperText').innerText = "Espera tu turno...";
                 }
             } else {
                 const active = room.players.find(p => p.id === room.turnId);
@@ -601,10 +652,10 @@
         });
 
         socket.on('returned_to_lobby', (room) => {
+            clearInterval(clockInterval);
             if (!room) { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); return; }
             document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); 
             
-            // Los espectadores ahora son jugadores (si hay espacio)
             soyEspectador = false;
             document.getElementById('playerControlPanel').classList.remove('hidden');
             document.getElementById('spectatorBanner').classList.add('hidden');
@@ -613,6 +664,7 @@
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
+            clearInterval(clockInterval);
             document.getElementById('knockerName').innerText = knocker === 'Mesa Cerrada' ? 'Ronda finalizada (Mesa cerrada)' : `Cierre por: ${knocker}`;
             const titleAlert = document.getElementById('victoryAlert');
             if(wasVolteado) titleAlert.innerHTML = `🔥 ¡VOLTEADA COMPLETA! 🔥<br><span style="font-size:14px; color:#f1c40f;">${winner} acomodó mejor sus cartas</span>`;
