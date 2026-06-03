@@ -27,11 +27,20 @@
         .char-btn { background: #5c3a21; border: 2px solid #3d2314; border-radius: 10px; padding: 5px; font-size: 24px; cursor: pointer; }
         .char-btn.my-selection { border-color: #f1c40f; background: #c0392b; box-shadow: 0 0 15px #f1c40f; }
 
+        /* LISTA SALAS */
         .room-list-container { background: rgba(0,0,0,0.4); border: 1px solid #aa7f18; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;}
         .room-item { background: #2c160b; border: 1px solid #5c3a21; border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
         .room-item button { width: auto; margin: 0; padding: 5px 15px; font-size: 12px; }
 
-        /* MESA TIPO GOVERNOR OF POKER */
+        /* PANEL ADMIN */
+        .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #aa7f18; }
+        .settings-title { margin: 0 0 10px 0; color: #f1c40f; text-align: center; border-bottom: 1px solid #5c3a21; padding-bottom: 5px; font-size: 14px;}
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; text-align: left; }
+        .setting-item { display: flex; flex-direction: column; }
+        .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold; }
+        .setting-item select { width: 100%; padding: 6px; font-size: 12px; background: #2c160b; color: white; border: 1px solid #f1c40f; border-radius: 5px; }
+
+        /* MESA GOVERNOR OF POKER */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; overflow: hidden; width: 100%; }
         
         .poker-table-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 40vh;}
@@ -73,6 +82,7 @@
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-width: 85%; max-height: 15vh; overflow-y: auto; z-index: 2;}
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 6px; border: 1px solid #f1c40f; cursor: pointer; }
         
+        /* AVATARES */
         .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 2; }
         .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .avatar-icon { font-size: 26px; background: #c0392b; border: 2px solid #f1c40f; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
@@ -85,7 +95,7 @@
         /* BURLA POPUP BASE */
         .taunt-popup { position: absolute; top: 50%; left: 50%; margin-top:-40px; margin-left:-27px; z-index: 999; pointer-events: none; }
 
-        /* PANEL INFERIOR (FLEXBOX PARA EVITAR OVERLAP) */
+        /* PANEL INFERIOR Y FLEXBOX */
         .bottom-panel { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; background: linear-gradient(to top, #1a0f08 80%, transparent); padding-bottom: 5px; z-index: 50; }
         
         .status-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: 98%; max-width: 700px; margin-bottom: 5px; }
@@ -100,14 +110,13 @@
 
         .spectator-banner { background: #d35400; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
 
-        /* CHAT BURBUJA (FAB) */
+        /* CHAT BURBUJA */
         #chatBox { position: absolute; right: 10px; bottom: 10px; width: 250px; background: rgba(61, 35, 20, 0.95); border: 2px solid #5c3a21; border-radius: 8px; z-index: 80; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); transition: all 0.3s ease;}
         .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; position: relative;}
         .chat-header h4 { margin: 0; font-family: 'Segoe UI', sans-serif;}
         
         .notification-dot { position: absolute; top: -2px; right: 2px; width: 14px; height: 14px; background: #e74c3c; border-radius: 50%; box-shadow: 0 0 5px #e74c3c; z-index: 90;}
 
-        /* Icono Minimizado */
         #chatBox.minimized { width: 50px; height: 50px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: linear-gradient(135deg, #d4af37, #aa7f18); border: 2px solid #fff; overflow: hidden;}
         #chatBox.minimized::before { content: "💬"; font-size: 24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
         #chatBox.minimized .chat-header h4, #chatBox.minimized #chatToggleIcon, #chatBox.minimized #chatMessages, #chatBox.minimized .chat-input-area, #chatBox.minimized .chat-emotes { display: none; }
@@ -119,12 +128,16 @@
         .chat-emotes { display: flex; gap: 5px; justify-content: center; }
         .emote-btn { background: #2c160b; border: 1px solid #f1c40f; border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0;}
 
+        /* MODAL ETIQUETAS VICTORIA/VOLTEADO */
+        .badge-victory { background:#27ae60; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px; font-weight:900; box-shadow: 0 0 5px #27ae60; }
+        .badge-volteado { background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px; font-weight:900; box-shadow: 0 0 10px #e74c3c; animation: pulse 1s infinite; }
+
         @media (max-width: 480px) {
             .poker-table-wrapper { min-height: 35vh; }
             .poker-table { height: 100%; border-width: 8px; }
             .card, .deck-slot, .card-back { width: 45px; height: 70px; font-size: 11px; padding: 2px; }
             .card-back::after { font-size: 20px; padding: 2px; }
-            #chatBox { right: 5px; bottom: 50px; width: 220px; } /* Un poco más arriba en cel */
+            #chatBox { right: 5px; bottom: 50px; width: 220px; } 
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatBox.minimized::before { font-size: 20px; }
             #chatMessages { max-height: 80px; font-size: 11px; }
@@ -132,6 +145,7 @@
             .avatar-icon { width: 35px; height: 35px; font-size: 18px; }
             .status-bar button { font-size: 10px; padding: 5px 8px; }
             .hand-container { gap: 3px; min-height: 75px; }
+            .settings-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -153,28 +167,30 @@
     <div class="container hidden" id="waitingRoom">
         <h2 class="western-title">Sala: <span id="displayCode" style="color:#f1c40f;">----</span></h2>
         
-        <div id="hostSettingsArea" class="hidden" style="background:rgba(0,0,0,0.5); padding:10px; border-radius:10px; margin:10px 0; border: 1px solid #5c3a21;">
-            <h4 style="margin:0 0 5px 0; color:#f1c40f;">⚙️ Reglas de la Mesa (Admin)</h4>
-            <div style="display:flex; justify-content:space-around; font-size:12px; gap: 5px; flex-wrap: wrap;">
-                <div>
-                    <label>Jugadores:</label><br>
-                    <select id="setPlayers" onchange="sendSettings()"><option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option></select>
+        <div id="hostSettingsArea" class="hidden settings-panel">
+            <h4 class="settings-title">⚙️ Panel de Administrador</h4>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label>👥 Máx. Jugadores</label>
+                    <select id="setPlayers" onchange="sendSettings()">
+                        <option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option>
+                    </select>
                 </div>
-                <div>
-                    <label>Jokers:</label><br>
+                <div class="setting-item">
+                    <label>🃏 Jokers</label>
                     <select id="setJokers" onchange="sendSettings()">
                         <option value="0">0 Jokers</option><option value="1">1 Joker</option><option value="2" selected>2 Jokers</option>
                         <option value="3">3 Jokers</option><option value="4">4 Jokers</option><option value="5">5 Jokers</option>
                     </select>
                 </div>
-                <div>
-                    <label>Turno:</label><br>
+                <div class="setting-item">
+                    <label>⏱️ Tiempo/Turno</label>
                     <select id="setTurnTime" onchange="sendSettings()">
                         <option value="15">15 seg</option><option value="30" selected>30 seg</option><option value="45">45 seg</option><option value="60">60 seg</option>
                     </select>
                 </div>
-                <div style="width:100%; margin-top:5px;">
-                    <label>Iniciar (Admin):</label>
+                <div class="setting-item">
+                    <label>🎲 Empieza</label>
                     <select id="setStarter" onchange="sendSettings()"></select>
                 </div>
             </div>
@@ -185,6 +201,7 @@
         <ul id="playerList" style="list-style:none; padding:0; font-size:14px; text-align:left; line-height:1.8;"></ul>
         <button id="readyBtn" onclick="toggleReady()">MARCAR LISTO</button>
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background: linear-gradient(#27ae60, #2ecc71);">REPARTIR CARTAS 🚀</button>
+        <button onclick="leaveRoom()" style="margin-top:5px; background: linear-gradient(#c0392b, #900);">🚪 Salir de la Sala</button>
     </div>
 
     <div class="board hidden" id="gameBoard">
@@ -224,10 +241,10 @@
             👀 Estás de Espectador. Espera a que termine la ronda.
         </div>
 
-        <div id="chatBox" class="minimized" onclick="if(this.classList.contains('minimized')) toggleChat()">
+        <div id="chatBox" class="minimized" onclick="if(this.classList.contains('minimized')) toggleChat(event)">
             <div class="chat-header" onclick="toggleChat(event)">
                 <h4>💬 Chat del Saloon</h4>
-                <span id="chatToggleIcon">▲</span>
+                <span id="chatToggleIcon">▼</span>
             </div>
             <div id="chatNotif" class="notification-dot hidden"></div>
             <div id="chatMessages"></div>
@@ -249,7 +266,11 @@
         <p style="margin:0;"><strong id="knockerName">-</strong></p>
         <h2 id="victoryAlert" style="color:#f1c40f; margin:10px 0;">Ganador</h2>
         <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px;" id="modalScoreBody"></table>
-        <button onclick="returnToLobby()">Volver a la Sala</button>
+        
+        <div style="display:flex; gap:10px; margin-top: 15px;">
+            <button onclick="returnToLobby()" style="flex:1;">🔄 Volver a la Sala</button>
+            <button onclick="leaveRoom()" style="flex:1; background: linear-gradient(#c0392b, #900);">🚪 Salir del Juego</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -265,7 +286,7 @@
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
 
         function playSound(type) {
-            // Placeholder: if(type === 'taunt') new Audio('taunt.mp3').play();
+            // Ejemplo: if(type === 'taunt') new Audio('taunt.mp3').play();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -324,12 +345,6 @@
             });
         }
         
-        function transferHost(targetId) {
-            if(confirm("¿Seguro que quieres ceder la administración de la sala?")) {
-                socket.emit('transfer_host', { roomId: currentRoomId, targetId });
-            }
-        }
-
         function pickCharacter(char) { socket.emit('select_character', { roomId: currentRoomId, character: char }); }
         function toggleReady() { socket.emit('toggle_ready', currentRoomId); }
         function startGame() { socket.emit('start_game', currentRoomId); }
@@ -346,12 +361,25 @@
         function surrenderHand() { if (confirm("🪦 ¿Retirarse de esta ronda? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
+        function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
+        
+        // Abandonar Sala Totalmente
+        function leaveRoom() { socket.emit('leave_room', currentRoomId); }
+        socket.on('left_room', () => {
+            currentRoomId = ''; soyHost = false; soyEspectador = false;
+            clearInterval(clockInterval);
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('gameBoard').classList.add('hidden');
+            document.getElementById('waitingRoom').classList.add('hidden');
+            document.getElementById('lobby').classList.remove('hidden');
+        });
+
         function toggleChat(e) {
             if(e) e.stopPropagation();
             const chatBox = document.getElementById('chatBox');
             chatBox.classList.toggle('minimized');
             if (!chatBox.classList.contains('minimized')) {
-                document.getElementById('chatNotif').classList.add('hidden'); // Limpia notif al abrir
+                document.getElementById('chatNotif').classList.add('hidden'); 
             }
         }
 
@@ -392,7 +420,6 @@
             avatarDiv.appendChild(popup);
             playSound('taunt');
 
-            // Cálcular dirección hacia el centro de la pantalla
             const rect = avatarDiv.getBoundingClientRect();
             const avatarCenterX = rect.left + rect.width / 2;
             const avatarCenterY = rect.top + rect.height / 2;
@@ -402,9 +429,8 @@
             let diffX = screenCenterX - avatarCenterX;
             let diffY = screenCenterY - avatarCenterY;
 
-            // Normalización del Vector
             const length = Math.sqrt(diffX*diffX + diffY*diffY);
-            const moveDistance = 90; // Distancia de empuje de la burla
+            const moveDistance = 90; 
             const moveX = length > 0 ? (diffX / length) * moveDistance : 0;
             const moveY = length > 0 ? (diffY / length) * moveDistance : -50; 
 
@@ -550,11 +576,7 @@
             room.players.forEach(p => {
                 if (p.ready) readyCount++;
                 const isStarter = p.id === room.startingPlayerId;
-                
-                // Botón Ceder Host (solo si yo soy host y no soy el listado)
-                let btnHost = (soyHost && p.id !== socket.id) ? `<button onclick="transferHost('${p.id}')" style="padding:2px 6px; font-size:10px; width:auto; margin-left:10px; background:#f1c40f; color:black;">👑 Ceder Host</button>` : '';
-
-                list.innerHTML += `<li>${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} — ${p.ready ? '🟢 LISTO' : '❌ PENSANDO...'} ${isStarter ? '👑' : ''} ${btnHost}</li>`;
+                list.innerHTML += `<li>${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} — ${p.ready ? '🟢 LISTO' : '❌ PENSANDO...'} ${isStarter ? '👑' : ''}</li>`;
             });
 
             const rBtn = document.getElementById('readyBtn');
@@ -696,6 +718,13 @@
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
                 const isWinner = s.name === winner;
+                
+                let resultBadge = '';
+                if (isWinner) {
+                    if (wasVolteado) resultBadge = '<span class="badge-volteado">VOLTEADO 💥</span>';
+                    else resultBadge = '<span class="badge-victory">VICTORIA 🏆</span>';
+                }
+
                 let handHTML = '<div style="margin-top: 4px;">';
                 s.finalHand.forEach(c => {
                     let col = (c.suit === 'hearts' || c.suit === 'diamonds') ? '#c0392b' : ((c.rank === 'Joker') ? '#8e44ad' : '#ecf0f1');
@@ -706,7 +735,7 @@
                 tbody.innerHTML += `
                     <tr style="border-bottom: 1px solid #5c3a21; background: ${isWinner ? 'rgba(241,196,15,0.2)' : 'transparent'};">
                         <td style="text-align: left; padding: 8px;">
-                            <strong>${s.character || '❓'} ${s.name}</strong> ${isWinner ? '👑' : ''}
+                            <strong>${s.character || '❓'} ${s.name}</strong> ${resultBadge}
                             ${handHTML}
                         </td>
                         <td style="vertical-align: middle; font-size: 16px; color:#f1c40f;"><strong>${s.score}</strong> pts</td>
