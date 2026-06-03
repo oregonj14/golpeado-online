@@ -145,7 +145,7 @@ const canPlugIn = (group, card) => isValidMelding([...group, card]);
 const sanitizeRoom = (room) => {
     return {
         id: room.id, 
-        hostId: room.players[0]?.id, // Fundamental para asignar permisos UI
+        hostId: room.players[0]?.id, 
         players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered })),
         spectators: room.spectators.map(s => ({ id: s.id, name: s.name })), 
         topDiscard: room.discardPile[room.discardPile.length - 1] || null, 
@@ -155,7 +155,7 @@ const sanitizeRoom = (room) => {
         exposedGroups: room.exposedGroups, 
         maxPlayers: room.maxPlayers, 
         jokerCount: room.jokerCount, 
-        turnTime: room.turnTime, // Enviar tiempo de turno configurado
+        turnTime: room.turnTime, 
         state: room.state, 
         startingPlayerId: room.startingPlayerId, 
         kickVotes: room.kickVotes,
@@ -238,6 +238,47 @@ const forceGameOver = (roomId) => {
     io.to(roomId).emit('game_over', { scores, knocker: 'Mesa Cerrada', winner: scores[0].name, wasVolteado: false });
 };
 
+// Función para remover a un jugador de una sala y manejar consecuencias
+const handleLeaveRoom = (socket, roomId) => {
+    let room = rooms[roomId];
+    if (!room) return false;
+    
+    let changed = false;
+    let specIdx = room.spectators.findIndex(s => s.id === socket.id);
+    if (specIdx > -1) { room.spectators.splice(specIdx, 1); changed = true; }
+
+    let idx = room.players.findIndex(p => p.id === socket.id);
+    if (idx > -1) {
+        room.players.splice(idx, 1);
+        if (room.players.length === 0) {
+            clearTimeout(room.turnTimer);
+            delete rooms[roomId];
+        } else {
+            // Manejo de la lógica si la partida estaba activa
+            if (room.state === 'playing') {
+                if (room.players.length < 2) {
+                    clearTimeout(room.turnTimer);
+                    room.state = 'waiting';
+                    io.to(roomId).emit('returned_to_lobby', sanitizeRoom(room));
+                } else {
+                    if (room.turnIndex === idx) {
+                        room.turnIndex = room.turnIndex % room.players.length;
+                        room.phase = 'draw';
+                        startTurnTimer(roomId);
+                    } else if (room.turnIndex > idx) {
+                        room.turnIndex--;
+                    }
+                    io.to(roomId).emit('update_game', sanitizeRoom(room));
+                }
+            } else {
+                io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+            }
+        }
+        changed = true;
+    }
+    return changed;
+};
+
 io.on('connection', (socket) => {
     
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
@@ -300,15 +341,11 @@ io.on('connection', (socket) => {
         broadcastPublicRooms();
     });
 
-    // TRANSFERENCIA MANUAL DE HOST
-    socket.on('transfer_host', ({ roomId, targetId }) => {
-        const room = rooms[roomId];
-        if (!room || room.players[0].id !== socket.id || room.state !== 'waiting') return;
-        const targetIdx = room.players.findIndex(p => p.id === targetId);
-        if (targetIdx > 0) {
-            const newHost = room.players.splice(targetIdx, 1)[0];
-            room.players.unshift(newHost); // Mover a posición 0
-            io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+    // Nuevo Evento explícito para salir voluntariamente
+    socket.on('leave_room', (roomId) => {
+        if (handleLeaveRoom(socket, roomId)) {
+            socket.leave(roomId);
+            socket.emit('left_room');
             broadcastPublicRooms();
         }
     });
@@ -316,18 +353,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         let changed = false;
         for (let roomId in rooms) {
-            let room = rooms[roomId];
-            let specIdx = room.spectators.findIndex(s => s.id === socket.id);
-            if (specIdx > -1) { room.spectators.splice(specIdx, 1); changed = true; }
-
-            let idx = room.players.findIndex(p => p.id === socket.id);
-            if (idx > -1 && room.state === 'waiting') {
-                room.players.splice(idx, 1);
-                // Si la sala queda vacía, la borramos. Si no, el nuevo índice 0 asume como host automáticamente.
-                if (room.players.length === 0) { clearTimeout(room.turnTimer); delete rooms[roomId]; } 
-                else { io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
+            if (handleLeaveRoom(socket, roomId)) {
                 changed = true;
-                break;
             }
         }
         if(changed) broadcastPublicRooms();
@@ -537,7 +564,9 @@ io.on('connection', (socket) => {
         const knocker = room.players.find(p => p.id === socket.id);
         if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
 
-        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ No puedes golpear con 8 cartas. Primero debes descartar.');
+        // REGLA: Bloqueo total si el jugador ya robó (se encuentra en fase 'discard')
+        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear al inicio de tu turno, ANTES de robar.');
+        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Tu turno terminó mal, no puedes golpear ahora.');
 
         let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
         let hasInHand = hasValidGroup(knocker.hand);
