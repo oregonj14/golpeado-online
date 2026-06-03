@@ -27,12 +27,11 @@
         .char-btn { background: #5c3a21; border: 2px solid #3d2314; border-radius: 10px; padding: 5px; font-size: 24px; cursor: pointer; }
         .char-btn.my-selection { border-color: #f1c40f; background: #c0392b; box-shadow: 0 0 15px #f1c40f; }
 
-        /* LISTA SALAS */
         .room-list-container { background: rgba(0,0,0,0.4); border: 1px solid #aa7f18; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;}
         .room-item { background: #2c160b; border: 1px solid #5c3a21; border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
         .room-item button { width: auto; margin: 0; padding: 5px 15px; font-size: 12px; }
 
-        /* PANEL ADMIN */
+        /* PANEL ADMIN GRID */
         .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #aa7f18; }
         .settings-title { margin: 0 0 10px 0; color: #f1c40f; text-align: center; border-bottom: 1px solid #5c3a21; padding-bottom: 5px; font-size: 14px;}
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; text-align: left; }
@@ -40,7 +39,6 @@
         .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold; }
         .setting-item select { width: 100%; padding: 6px; font-size: 12px; background: #2c160b; color: white; border: 1px solid #f1c40f; border-radius: 5px; }
 
-        /* MESA GOVERNOR OF POKER */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; overflow: hidden; width: 100%; }
         
         .poker-table-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 40vh;}
@@ -82,7 +80,6 @@
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-width: 85%; max-height: 15vh; overflow-y: auto; z-index: 2;}
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 6px; border: 1px solid #f1c40f; cursor: pointer; }
         
-        /* AVATARES */
         .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 2; }
         .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .avatar-icon { font-size: 26px; background: #c0392b; border: 2px solid #f1c40f; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
@@ -92,10 +89,8 @@
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
-        /* BURLA POPUP BASE */
         .taunt-popup { position: absolute; top: 50%; left: 50%; margin-top:-40px; margin-left:-27px; z-index: 999; pointer-events: none; }
 
-        /* PANEL INFERIOR Y FLEXBOX */
         .bottom-panel { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; background: linear-gradient(to top, #1a0f08 80%, transparent); padding-bottom: 5px; z-index: 50; }
         
         .status-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: 98%; max-width: 700px; margin-bottom: 5px; }
@@ -110,7 +105,6 @@
 
         .spectator-banner { background: #d35400; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
 
-        /* CHAT BURBUJA */
         #chatBox { position: absolute; right: 10px; bottom: 10px; width: 250px; background: rgba(61, 35, 20, 0.95); border: 2px solid #5c3a21; border-radius: 8px; z-index: 80; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); transition: all 0.3s ease;}
         .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; position: relative;}
         .chat-header h4 { margin: 0; font-family: 'Segoe UI', sans-serif;}
@@ -363,8 +357,8 @@
 
         function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
         
-        // Abandonar Sala Totalmente
         function leaveRoom() { socket.emit('leave_room', currentRoomId); }
+        
         socket.on('left_room', () => {
             currentRoomId = ''; soyHost = false; soyEspectador = false;
             clearInterval(clockInterval);
@@ -400,7 +394,6 @@
             }
         });
 
-        // BURLA CON CÁLCULO DE VECTORES
         function tauntCard() {
             if (selectedCards.length === 1) {
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] });
@@ -698,14 +691,17 @@
             }
         });
 
+        // ¡EVENTOS DE RESETEO CORREGIDOS COMPLETAMENTE!
         socket.on('returned_to_lobby', (room) => {
             clearInterval(clockInterval);
-            if (!room) { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); return; }
-            document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); 
+            document.getElementById('gameBoard').classList.add('hidden'); 
+            document.getElementById('victoryModal').classList.add('hidden'); 
+            document.getElementById('waitingRoom').classList.remove('hidden'); 
             
             soyEspectador = false;
             document.getElementById('playerControlPanel').classList.remove('hidden');
             document.getElementById('spectatorBanner').classList.add('hidden');
+            selectedCards = [];
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
