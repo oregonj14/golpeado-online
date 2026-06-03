@@ -238,7 +238,6 @@ const forceGameOver = (roomId) => {
     io.to(roomId).emit('game_over', { scores, knocker: 'Mesa Cerrada', winner: scores[0].name, wasVolteado: false });
 };
 
-// Función para remover a un jugador de una sala y manejar consecuencias
 const handleLeaveRoom = (socket, roomId) => {
     let room = rooms[roomId];
     if (!room) return false;
@@ -254,7 +253,6 @@ const handleLeaveRoom = (socket, roomId) => {
             clearTimeout(room.turnTimer);
             delete rooms[roomId];
         } else {
-            // Manejo de la lógica si la partida estaba activa
             if (room.state === 'playing') {
                 if (room.players.length < 2) {
                     clearTimeout(room.turnTimer);
@@ -341,7 +339,6 @@ io.on('connection', (socket) => {
         broadcastPublicRooms();
     });
 
-    // Nuevo Evento explícito para salir voluntariamente
     socket.on('leave_room', (roomId) => {
         if (handleLeaveRoom(socket, roomId)) {
             socket.leave(roomId);
@@ -353,9 +350,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         let changed = false;
         for (let roomId in rooms) {
-            if (handleLeaveRoom(socket, roomId)) {
-                changed = true;
-            }
+            if (handleLeaveRoom(socket, roomId)) { changed = true; }
         }
         if(changed) broadcastPublicRooms();
     });
@@ -448,7 +443,10 @@ io.on('connection', (socket) => {
 
         room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = [];
         room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
+        
+        // ¡LA SOLUCIÓN A LA PANTALLA CONGELADA! Emitir ambos eventos para limpiar UI.
         io.to(roomId).emit('returned_to_lobby', sanitizeRoom(room));
+        io.to(roomId).emit('update_lobby', sanitizeRoom(room));
         broadcastPublicRooms();
     });
 
@@ -564,7 +562,6 @@ io.on('connection', (socket) => {
         const knocker = room.players.find(p => p.id === socket.id);
         if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
 
-        // REGLA: Bloqueo total si el jugador ya robó (se encuentra en fase 'discard')
         if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear al inicio de tu turno, ANTES de robar.');
         if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Tu turno terminó mal, no puedes golpear ahora.');
 
