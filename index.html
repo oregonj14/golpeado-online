@@ -39,6 +39,9 @@
         .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold; }
         .setting-item select { width: 100%; padding: 6px; font-size: 12px; background: #2c160b; color: white; border: 1px solid #f1c40f; border-radius: 5px; }
 
+        /* HISTORIAL DE SALA */
+        .room-history-container { background: rgba(0,0,0,0.4); border: 1px solid #2980b9; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 180px; overflow-y: auto; }
+
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; overflow: hidden; width: 100%; }
         
         .poker-table-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 40vh;}
@@ -105,36 +108,38 @@
 
         .spectator-banner { background: #d35400; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
 
-        #chatBox { position: absolute; right: 10px; bottom: 10px; width: 250px; background: rgba(61, 35, 20, 0.95); border: 2px solid #5c3a21; border-radius: 8px; z-index: 80; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); transition: all 0.3s ease;}
+        /* CHAT UNIVERSAL GLOBAL */
+        #chatBox { position: fixed; right: 15px; bottom: 15px; width: 260px; background: rgba(61, 35, 20, 0.95); border: 2px solid #5c3a21; border-radius: 8px; z-index: 9999; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); transition: all 0.3s ease;}
         .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; position: relative;}
         .chat-header h4 { margin: 0; font-family: 'Segoe UI', sans-serif;}
         
-        .notification-dot { position: absolute; top: -2px; right: 2px; width: 14px; height: 14px; background: #e74c3c; border-radius: 50%; box-shadow: 0 0 5px #e74c3c; z-index: 90;}
+        .notification-dot { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #e74c3c; border-radius: 50%; box-shadow: 0 0 8px #e74c3c; z-index: 90;}
 
-        #chatBox.minimized { width: 50px; height: 50px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: linear-gradient(135deg, #d4af37, #aa7f18); border: 2px solid #fff; overflow: hidden;}
-        #chatBox.minimized::before { content: "💬"; font-size: 24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
+        #chatBox.minimized { width: 55px; height: 55px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: linear-gradient(135deg, #d4af37, #aa7f18); border: 2px solid #fff; overflow: hidden;}
+        #chatBox.minimized::before { content: "💬"; font-size: 26px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
         #chatBox.minimized .chat-header h4, #chatBox.minimized #chatToggleIcon, #chatBox.minimized #chatMessages, #chatBox.minimized .chat-input-area, #chatBox.minimized .chat-emotes { display: none; }
 
-        #chatMessages { flex: 1; max-height: 120px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4; word-wrap: break-word;}
+        #chatMessages { flex: 1; max-height: 150px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4; word-wrap: break-word;}
         .chat-input-area { display: flex; gap: 5px; margin-bottom: 5px; }
-        .chat-input-area input { flex: 1; padding: 5px; border-radius: 4px; border: 1px solid #aa7f18; font-size: 12px; color: black; background: #ecf0f1; margin:0;}
-        .chat-input-area button { width: auto; padding: 5px 10px; margin: 0; font-size: 11px; }
+        .chat-input-area input { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #aa7f18; font-size: 12px; color: black; background: #ecf0f1; margin:0;}
+        .chat-input-area button { width: auto; padding: 6px 10px; margin: 0; font-size: 11px; }
         .chat-emotes { display: flex; gap: 5px; justify-content: center; }
         .emote-btn { background: #2c160b; border: 1px solid #f1c40f; border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0;}
 
-        /* MODAL ETIQUETAS VICTORIA/VOLTEADO */
-        .badge-victory { background:#27ae60; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px; font-weight:900; box-shadow: 0 0 5px #27ae60; }
-        .badge-volteado { background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px; font-weight:900; box-shadow: 0 0 10px #e74c3c; animation: pulse 1s infinite; }
+        /* MODAL ETIQUETAS */
+        .badge-victory { background:#27ae60; color:white; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 8px #27ae60; text-transform: uppercase; }
+        .badge-volteado { background:#e74c3c; color:white; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 12px #e74c3c; animation: pulseRed 1s infinite; text-transform: uppercase;}
+        @keyframes pulseRed { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
         @media (max-width: 480px) {
             .poker-table-wrapper { min-height: 35vh; }
             .poker-table { height: 100%; border-width: 8px; }
             .card, .deck-slot, .card-back { width: 45px; height: 70px; font-size: 11px; padding: 2px; }
             .card-back::after { font-size: 20px; padding: 2px; }
-            #chatBox { right: 5px; bottom: 50px; width: 220px; } 
-            #chatBox.minimized { width: 45px; height: 45px; }
-            #chatBox.minimized::before { font-size: 20px; }
-            #chatMessages { max-height: 80px; font-size: 11px; }
+            #chatBox { right: 10px; bottom: 65px; width: 230px; } 
+            #chatBox.minimized { width: 50px; height: 50px; }
+            #chatBox.minimized::before { font-size: 22px; }
+            #chatMessages { max-height: 100px; font-size: 11px; }
             .western-title { font-size: 1.5rem; }
             .avatar-icon { width: 35px; height: 35px; font-size: 18px; }
             .status-bar button { font-size: 10px; padding: 5px 8px; }
@@ -145,12 +150,32 @@
 </head>
 <body>
 
-    <div class="container" id="lobby">
+    <div class="container" id="authScreen">
         <h1 class="western-title">🤠 Saloon Golpeado 🃏</h1>
-        <input type="text" id="username" placeholder="Ingresa tu Nick">
+        <p style="color:#f1c40f; font-size:14px;">Identifícate para entrar al Saloon</p>
+        <input type="text" id="authUsername" placeholder="Nickname">
+        <input type="password" id="authPassword" placeholder="Contraseña">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button onclick="login()" style="flex:1;">Entrar</button>
+            <button onclick="register()" style="flex:1; background: linear-gradient(#27ae60, #2ecc71);">Crear Cuenta</button>
+        </div>
+        <p id="authError" style="color:#e74c3c; font-size:12px; height:15px; margin-top:10px;"></p>
+    </div>
+
+    <div class="container hidden" id="lobby">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #5c3a21; padding-bottom:10px; margin-bottom:15px;">
+            <div style="text-align:left;">
+                <h3 style="margin:0; color:#f1c40f;" id="profileName">Jugador</h3>
+                <span style="font-size:12px; color:#ecf0f1;">🏆 Victorias: <strong id="profileWins">0</strong> | 💰 Fichas: <strong id="profilePoints">0</strong></span>
+            </div>
+            <button style="width:auto; padding:5px 10px; font-size:12px; background:linear-gradient(#8e44ad, #5e3370);" onclick="alert('Próximamente: Tienda y Ranking!')">🛒 Tienda</button>
+        </div>
+
         <button onclick="createRoom()">Crear Mesa Privada</button>
-        <input type="text" id="roomCode" placeholder="Código de Sala">
-        <button onclick="joinRoom()">Unirse por Código</button>
+        <div style="display:flex; gap:5px; margin: 10px 0;">
+            <input type="text" id="roomCode" placeholder="Código de Sala" style="margin:0;">
+            <button onclick="joinRoom()" style="width:auto; margin:0;">Unirse</button>
+        </div>
 
         <div class="room-list-container">
             <h4 style="margin: 0 0 10px 0; color: #f1c40f;">🚪 Mesas Abiertas en el Saloon:</h4>
@@ -190,7 +215,14 @@
             </div>
         </div>
 
-        <h4 style="color:#ecf0f1;">🎭 Elige tu sombrero:</h4>
+        <div class="room-history-container" id="roomHistoryArea">
+            <h4 style="margin:0 0 8px 0; color:#f1c40f;">📜 Historial de Partidas (Esta Sesión)</h4>
+            <div id="roomHistoryList">
+                <span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span>
+            </div>
+        </div>
+
+        <h4 style="color:#ecf0f1; margin-top:15px;">🎭 Elige tu sombrero:</h4>
         <div class="char-grid" id="charactersGrid"></div>
         <ul id="playerList" style="list-style:none; padding:0; font-size:14px; text-align:left; line-height:1.8;"></ul>
         <button id="readyBtn" onclick="toggleReady()">MARCAR LISTO</button>
@@ -234,24 +266,24 @@
         <div id="spectatorBanner" class="spectator-banner hidden">
             👀 Estás de Espectador. Espera a que termine la ronda.
         </div>
+    </div>
 
-        <div id="chatBox" class="minimized" onclick="if(this.classList.contains('minimized')) toggleChat(event)">
-            <div class="chat-header" onclick="toggleChat(event)">
-                <h4>💬 Chat del Saloon</h4>
-                <span id="chatToggleIcon">▼</span>
-            </div>
-            <div id="chatNotif" class="notification-dot hidden"></div>
-            <div id="chatMessages"></div>
-            <div class="chat-input-area">
-                <input type="text" id="chatInput" placeholder="Mensaje...">
-                <button onclick="sendTypedChat()">Enviar</button>
-            </div>
-            <div class="chat-emotes">
-                <button class="emote-btn" onclick="sendChat('🃏')">🃏</button>
-                <button class="emote-btn" onclick="sendChat('😂')">😂</button>
-                <button class="emote-btn" onclick="sendChat('😡')">😡</button>
-                <button class="emote-btn" onclick="sendChat('🤠')">🤠</button>
-            </div>
+    <div id="chatBox" class="minimized hidden" onclick="if(this.classList.contains('minimized')) toggleChat(event)">
+        <div class="chat-header" onclick="toggleChat(event)">
+            <h4>💬 Chat del Saloon</h4>
+            <span id="chatToggleIcon">▲</span>
+        </div>
+        <div id="chatNotif" class="notification-dot hidden"></div>
+        <div id="chatMessages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="Mensaje...">
+            <button onclick="sendTypedChat()">Enviar</button>
+        </div>
+        <div class="chat-emotes">
+            <button class="emote-btn" onclick="sendChat('🃏')">🃏</button>
+            <button class="emote-btn" onclick="sendChat('😂')">😂</button>
+            <button class="emote-btn" onclick="sendChat('😡')">😡</button>
+            <button class="emote-btn" onclick="sendChat('🤠')">🤠</button>
         </div>
     </div>
 
@@ -275,13 +307,12 @@
         let miPersonaje = null;
         let draggedElement = null;
         let clockInterval = null;
+        let loggedUser = null; 
 
         const characterList = ['🤠', '🦊', '🦁', '🐍', '🐺', '🦅', '🦈', '🤖', '💀', '👽']; 
         const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
 
-        function playSound(type) {
-            // Ejemplo: if(type === 'taunt') new Audio('taunt.mp3').play();
-        }
+        function playSound(type) {}
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('chatInput').addEventListener('keypress', function (e) {
@@ -290,6 +321,48 @@
         });
 
         socket.on('connect', () => { if (currentRoomId && myName) socket.emit('join_room', { roomId: currentRoomId, name: myName }); });
+
+        // --- SISTEMA DE AUTENTICACIÓN ---
+        async function register() {
+            const u = document.getElementById('authUsername').value.trim();
+            const p = document.getElementById('authPassword').value.trim();
+            if (!u || !p) return document.getElementById('authError').innerText = "Llena ambos campos.";
+            
+            const res = await fetch('/api/register', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+            if(res.ok) { document.getElementById('authError').style.color = '#27ae60'; document.getElementById('authError').innerText = data.message; }
+            else { document.getElementById('authError').style.color = '#e74c3c'; document.getElementById('authError').innerText = data.error; }
+        }
+
+        async function login() {
+            const u = document.getElementById('authUsername').value.trim();
+            const p = document.getElementById('authPassword').value.trim();
+            if (!u || !p) return document.getElementById('authError').innerText = "Llena ambos campos.";
+
+            const res = await fetch('/api/login', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+            
+            if(res.ok) {
+                loggedUser = data.user;
+                myName = loggedUser.username;
+                
+                document.getElementById('profileName').innerText = loggedUser.username;
+                document.getElementById('profileWins').innerText = loggedUser.victories;
+                document.getElementById('profilePoints').innerText = loggedUser.points;
+
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('lobby').classList.remove('hidden');
+                document.getElementById('chatBox').classList.remove('hidden'); // Mostrar chat global
+            } else {
+                document.getElementById('authError').innerText = data.error;
+            }
+        }
 
         socket.on('update_public_rooms', (rooms) => {
             const list = document.getElementById('publicRoomsList');
@@ -311,21 +384,18 @@
         });
 
         function createRoom() { 
-            myName = document.getElementById('username').value.trim(); 
-            if (!myName) return alert('⚠️ Ingresa tu nombre.');
-            socket.emit('create_room', { name: myName }); 
+            if (!loggedUser) return alert('Debes iniciar sesión.');
+            socket.emit('create_room', { name: loggedUser.username }); 
         }
 
         function joinRoom() { 
-            myName = document.getElementById('username').value.trim(); 
             const c = document.getElementById('roomCode').value.trim(); 
-            if (myName && c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: myName }); }
+            if (loggedUser && c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username }); }
         }
 
         function joinSpecificRoom(id) {
-            myName = document.getElementById('username').value.trim(); 
-            if (!myName) return alert('⚠️ Ingresa tu nombre antes de entrar a una sala.');
-            currentRoomId = id; socket.emit('join_room', { roomId: id, name: myName });
+            if (!loggedUser) return alert('Debes iniciar sesión.');
+            currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username });
         }
 
         function sendSettings() {
@@ -576,6 +646,20 @@
             if(myData && myData.ready) { rBtn.innerText = "¡ESTÁS LISTO! 🟢"; rBtn.style.background = "linear-gradient(#27ae60, #2ecc71)"; }
             else { rBtn.innerText = "MARCAR LISTO"; rBtn.style.background = "linear-gradient(to bottom, #d4af37, #aa7f18)"; }
 
+            // RENDER HISTORIAL DE SALA
+            const histList = document.getElementById('roomHistoryList');
+            if (room.history && room.history.length > 0) {
+                histList.innerHTML = room.history.map((h, i) => {
+                    let handHtml = h.hand.map(c => `<span style="color:${(c.suit==='hearts'||c.suit==='diamonds')?'#e74c3c':'#fff'}; font-size:10px; background:rgba(0,0,0,0.5); padding:1px 3px; border-radius:3px;">${c.rank}${suitIcons[c.suit]||'🃏'}</span>`).join(' ');
+                    return `<div style="background:rgba(0,0,0,0.4); padding:6px; border-radius:5px; margin-bottom:5px; font-size:12px;">
+                        <strong>#${i+1}</strong> - 🏆 <strong>${h.winner}</strong> (${h.score} pts) ${h.wasVolteado ? '<span style="color:#e74c3c; font-size:10px; font-weight:bold;">[Volteó💥]</span>' : ''}<br>
+                        <div style="margin-top:3px;">Mano: ${handHtml}</div>
+                    </div>`;
+                }).join('');
+            } else {
+                histList.innerHTML = '<span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span>';
+            }
+
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden');
             else document.getElementById('startBtn').classList.add('hidden');
         });
@@ -691,17 +775,14 @@
             }
         });
 
-        // ¡EVENTOS DE RESETEO CORREGIDOS COMPLETAMENTE!
         socket.on('returned_to_lobby', (room) => {
             clearInterval(clockInterval);
-            document.getElementById('gameBoard').classList.add('hidden'); 
-            document.getElementById('victoryModal').classList.add('hidden'); 
-            document.getElementById('waitingRoom').classList.remove('hidden'); 
+            if (!room) { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); return; }
+            document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); 
             
             soyEspectador = false;
             document.getElementById('playerControlPanel').classList.remove('hidden');
             document.getElementById('spectatorBanner').classList.add('hidden');
-            selectedCards = [];
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
