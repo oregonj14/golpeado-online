@@ -16,10 +16,17 @@
         
         .western-title { font-family: 'Rye', cursive; color: #f1c40f; text-shadow: 2px 2px 5px black; font-size: 2.2rem; margin: 10px 0;}
         
-        .container { max-width: 600px; margin: 2vh auto; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 15px; border: 2px solid #8e44ad; box-shadow: 0 8px 25px rgba(0,0,0,0.8); width: 90%; max-height: 95vh; overflow-y: auto;}
+        /* Paneles Modernos de Cristal */
+        .container { 
+            max-width: 600px; margin: 2vh auto; 
+            background: rgba(20, 10, 5, 0.85); backdrop-filter: blur(10px);
+            padding: 20px; border-radius: 15px; border: 1px solid #d4af37; 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.9); width: 90%; max-height: 95vh; overflow-y: auto;
+        }
+        
         input, select, button { padding: 10px; margin: 6px 0; border: none; border-radius: 5px; font-size: 15px; font-weight: bold; }
         input, select { width: 80%; background-color: #ecf0f1; color: black; box-sizing: border-box; }
-        button { background: linear-gradient(to bottom, #d4af37, #aa7f18); border: 2px solid #5c4000; color: #3e2700; cursor: pointer; width: 85%; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        button { background: linear-gradient(to bottom, #d4af37, #aa7f18); border: 1px solid #fff; color: #3e2700; cursor: pointer; width: 85%; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
         button:hover { filter: brightness(1.2); transform: scale(1.02); }
         .hidden { display: none !important; }
 
@@ -30,6 +37,11 @@
         .room-list-container { background: rgba(0,0,0,0.4); border: 1px solid #aa7f18; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;}
         .room-item { background: #2c160b; border: 1px solid #5c3a21; border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
         .room-item button { width: auto; margin: 0; padding: 5px 15px; font-size: 12px; }
+
+        /* LISTA DE JUGADORES ESTÉTICA */
+        .player-list-item { background: rgba(0,0,0,0.5); border-left: 4px solid #f1c40f; margin-bottom: 5px; padding: 8px 12px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
+        .badge-status-lobby { background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
+        .badge-status-waiting { background: #e67e22; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
 
         /* PANEL ADMIN GRID */
         .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #aa7f18; }
@@ -150,6 +162,7 @@
 </head>
 <body>
 
+    <!-- AUTH Y LOBBY PRINCIPAL -->
     <div class="container" id="authScreen">
         <h1 class="western-title">🤠 Saloon Golpeado 🃏</h1>
         <p style="color:#f1c40f; font-size:14px;">Identifícate para entrar al Saloon</p>
@@ -183,9 +196,11 @@
         </div>
     </div>
 
+    <!-- SALA DE ESPERA (LOBBY DE LA PARTIDA) -->
     <div class="container hidden" id="waitingRoom">
         <h2 class="western-title">Sala: <span id="displayCode" style="color:#f1c40f;">----</span></h2>
         
+        <!-- PANEL ADMIN GRID -->
         <div id="hostSettingsArea" class="hidden settings-panel">
             <h4 class="settings-title">⚙️ Panel de Administrador</h4>
             <div class="settings-grid">
@@ -215,6 +230,7 @@
             </div>
         </div>
 
+        <!-- HISTORIAL DE SALA -->
         <div class="room-history-container" id="roomHistoryArea">
             <h4 style="margin:0 0 8px 0; color:#f1c40f;">📜 Historial de Partidas (Esta Sesión)</h4>
             <div id="roomHistoryList">
@@ -222,14 +238,15 @@
             </div>
         </div>
 
-        <h4 style="color:#ecf0f1; margin-top:15px;">🎭 Elige tu sombrero:</h4>
+        <h4 style="color:#ecf0f1; margin-top:15px;">🎭 Elige tu sombrero y prepárate:</h4>
         <div class="char-grid" id="charactersGrid"></div>
-        <ul id="playerList" style="list-style:none; padding:0; font-size:14px; text-align:left; line-height:1.8;"></ul>
-        <button id="readyBtn" onclick="toggleReady()">MARCAR LISTO</button>
+        <div id="playerList" style="margin-top:10px;"></div>
+        <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background: linear-gradient(#27ae60, #2ecc71);">REPARTIR CARTAS 🚀</button>
         <button onclick="leaveRoom()" style="margin-top:5px; background: linear-gradient(#c0392b, #900);">🚪 Salir de la Sala</button>
     </div>
 
+    <!-- MESA DE JUEGO -->
     <div class="board hidden" id="gameBoard">
         <div class="poker-table-wrapper">
             <div class="opponents-container" id="opponentsArea"></div>
@@ -268,6 +285,7 @@
         </div>
     </div>
 
+    <!-- CHAT UNIVERSAL GLOBAL (Fuera del tablero) -->
     <div id="chatBox" class="minimized hidden" onclick="if(this.classList.contains('minimized')) toggleChat(event)">
         <div class="chat-header" onclick="toggleChat(event)">
             <h4>💬 Chat del Saloon</h4>
@@ -287,6 +305,7 @@
         </div>
     </div>
 
+    <!-- MODAL DE VICTORIA -->
     <div class="container hidden" id="victoryModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:1000; width:80%; max-width:500px;">
         <h1 class="western-title" style="color:#e74c3c; font-size:1.8rem;">💥 FIN DE MANO 💥</h1>
         <p style="margin:0;"><strong id="knockerName">-</strong></p>
@@ -294,7 +313,8 @@
         <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px;" id="modalScoreBody"></table>
         
         <div style="display:flex; gap:10px; margin-top: 15px;">
-            <button onclick="returnToLobby()" style="flex:1;">🔄 Volver a la Sala</button>
+            <!-- Retorno individual -->
+            <button onclick="returnToIndividualLobby()" style="flex:1;">🔄 Volver a la Sala</button>
             <button onclick="leaveRoom()" style="flex:1; background: linear-gradient(#c0392b, #900);">🚪 Salir del Juego</button>
         </div>
     </div>
@@ -358,7 +378,7 @@
 
                 document.getElementById('authScreen').classList.add('hidden');
                 document.getElementById('lobby').classList.remove('hidden');
-                document.getElementById('chatBox').classList.remove('hidden'); // Mostrar chat global
+                document.getElementById('chatBox').classList.remove('hidden'); 
             } else {
                 document.getElementById('authError').innerText = data.error;
             }
@@ -401,10 +421,8 @@
         function sendSettings() {
             if(!soyHost) return;
             socket.emit('change_settings', { 
-                roomId: currentRoomId, 
-                maxPlayers: document.getElementById('setPlayers').value, 
-                jokerCount: document.getElementById('setJokers').value, 
-                startingPlayerId: document.getElementById('setStarter').value,
+                roomId: currentRoomId, maxPlayers: document.getElementById('setPlayers').value, 
+                jokerCount: document.getElementById('setJokers').value, startingPlayerId: document.getElementById('setStarter').value,
                 turnTime: document.getElementById('setTurnTime').value
             });
         }
@@ -425,7 +443,7 @@
         function surrenderHand() { if (confirm("🪦 ¿Retirarse de esta ronda? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
 
-        function returnToLobby() { socket.emit('request_back_to_lobby', currentRoomId); }
+        function returnToIndividualLobby() { socket.emit('return_individual_lobby', currentRoomId); }
         
         function leaveRoom() { socket.emit('leave_room', currentRoomId); }
         
@@ -436,6 +454,18 @@
             document.getElementById('gameBoard').classList.add('hidden');
             document.getElementById('waitingRoom').classList.add('hidden');
             document.getElementById('lobby').classList.remove('hidden');
+        });
+
+        // Fuerce de pantalla solo para el jugador que presiona "Volver a sala"
+        socket.on('force_to_lobby', () => {
+            clearInterval(clockInterval);
+            document.getElementById('gameBoard').classList.add('hidden'); 
+            document.getElementById('victoryModal').classList.add('hidden'); 
+            document.getElementById('waitingRoom').classList.remove('hidden'); 
+            soyEspectador = false;
+            document.getElementById('playerControlPanel').classList.remove('hidden');
+            document.getElementById('spectatorBanner').classList.add('hidden');
+            selectedCards = [];
         });
 
         function toggleChat(e) {
@@ -459,9 +489,7 @@
             chat.innerHTML += `<div><strong>${character || '❓'} ${sender}:</strong> ${msg}</div>`;
             chat.scrollTop = chat.scrollHeight;
 
-            if(chatBox.classList.contains('minimized')) {
-                document.getElementById('chatNotif').classList.remove('hidden');
-            }
+            if(chatBox.classList.contains('minimized')) { document.getElementById('chatNotif').classList.remove('hidden'); }
         });
 
         function tauntCard() {
@@ -581,23 +609,23 @@
             });
         }
 
+        // --- ORDEN VISUAL RELOJERO (Clockwise) ---
         function getSeatPosition(index, totalOthers) {
             if (totalOthers === 1) return { top: '10%', left: '50%', transform: 'translateX(-50%)' };
             if (totalOthers === 2) {
-                if (index === 0) return { top: '25%', left: '10%' };
-                if (index === 1) return { top: '25%', left: '90%', transform: 'translateX(-100%)' };
+                if (index === 0) return { top: '25%', left: '85%', transform: 'translateX(-100%)' };
+                if (index === 1) return { top: '25%', left: '15%' };
             }
             if (totalOthers === 3) {
-                if (index === 0) return { top: '40%', left: '5%' };
+                if (index === 0) return { top: '40%', left: '90%', transform: 'translateX(-100%)' };
                 if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
-                if (index === 2) return { top: '40%', left: '95%', transform: 'translateX(-100%)' };
+                if (index === 2) return { top: '40%', left: '10%' };
             }
             if (totalOthers >= 4) {
-                if (index === 0) return { top: '45%', left: '5%' };
-                if (index === 1) return { top: '10%', left: '25%' };
-                if (index === 2) return { top: '10%', left: '75%', transform: 'translateX(-100%)' };
-                if (index === 3) return { top: '45%', left: '95%', transform: 'translateX(-100%)' };
-                if (index === 4) return { top: '65%', left: '5%' }; 
+                if (index === 0) return { top: '50%', left: '90%', transform: 'translateX(-100%)' };
+                if (index === 1) return { top: '15%', left: '75%', transform: 'translateX(-100%)' };
+                if (index === 2) return { top: '15%', left: '25%' };
+                if (index === 3) return { top: '50%', left: '10%' };
             }
             return { top: '0', left: '0' };
         }
@@ -634,12 +662,18 @@
                 grid.innerHTML += `<button class="char-btn ${isMySel ? 'my-selection' : ''}" onclick="pickCharacter('${char}')" ${isTaken ? 'disabled' : ''}>${char}</button>`;
             });
 
+            // ETIQUETAS DE ESTADO EN EL LOBBY
             const list = document.getElementById('playerList'); list.innerHTML = '';
             let readyCount = 0;
             room.players.forEach(p => {
-                if (p.ready) readyCount++;
+                if (p.ready && p.inLobby) readyCount++;
                 const isStarter = p.id === room.startingPlayerId;
-                list.innerHTML += `<li>${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} — ${p.ready ? '🟢 LISTO' : '❌ PENSANDO...'} ${isStarter ? '👑' : ''}</li>`;
+                let statusBadge = p.inLobby ? `<span class="badge-status-lobby">🟢 En Lobby</span>` : `<span class="badge-status-waiting">🟠 Viendo Resultados</span>`;
+                
+                list.innerHTML += `<div class="player-list-item">
+                    <span>${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} ${isStarter ? '👑' : ''}</span>
+                    <div>${p.ready ? '✅ LISTO' : '⏳ PENSANDO'} ${statusBadge}</div>
+                </div>`;
             });
 
             const rBtn = document.getElementById('readyBtn');
@@ -656,9 +690,7 @@
                         <div style="margin-top:3px;">Mano: ${handHtml}</div>
                     </div>`;
                 }).join('');
-            } else {
-                histList.innerHTML = '<span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span>';
-            }
+            } else { histList.innerHTML = '<span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span>'; }
 
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden');
             else document.getElementById('startBtn').classList.add('hidden');
@@ -714,11 +746,19 @@
                 }, 1000);
             } else { timerEl.style.display = 'none'; clearInterval(clockInterval); }
 
-            const opponents = room.players.filter(p => p.id !== socket.id);
+            // ORDEN VISUAL RELOJERO CORRECTO
             const oppArea = document.getElementById('opponentsArea'); oppArea.innerHTML = '';
+            let orderedOpponents = [];
+            
+            if (!soyEspectador) {
+                const myIndex = room.players.findIndex(p => p.id === socket.id);
+                for(let i=1; i < room.players.length; i++) {
+                    orderedOpponents.push(room.players[(myIndex + i) % room.players.length]);
+                }
+            } else { orderedOpponents = room.players; }
 
-            opponents.forEach((p, index) => {
-                const pos = getSeatPosition(index, opponents.length);
+            orderedOpponents.forEach((p, index) => {
+                const pos = getSeatPosition(index, orderedOpponents.length);
                 const isTurn = room.turnId === p.id;
                 oppArea.innerHTML += `
                     <div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}">
@@ -773,16 +813,6 @@
                 const active = room.players.find(p => p.id === room.turnId);
                 document.getElementById('turnIndicator').innerText = `Turno de: ${active ? active.name : '...'}`;
             }
-        });
-
-        socket.on('returned_to_lobby', (room) => {
-            clearInterval(clockInterval);
-            if (!room) { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); return; }
-            document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); 
-            
-            soyEspectador = false;
-            document.getElementById('playerControlPanel').classList.remove('hidden');
-            document.getElementById('spectatorBanner').classList.add('hidden');
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
