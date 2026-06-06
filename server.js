@@ -2,12 +2,51 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use(express.json());
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.use(express.static(__dirname));
+
+mongoose.connect('mongodb://127.0.0.1:27017/saloon_golpeado')
+    .then(() => console.log('📦 Base de Datos MongoDB Conectada'))
+    .catch(err => console.warn('⚠️ MongoDB no detectado. El juego funcionará en RAM temporal.'));
+
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    victories: { type: Number, default: 0 },
+    points: { type: Number, default: 0 }
+});
+const User = mongoose.model('User', UserSchema);
+
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const existingUser = await User.findOne({ username });
+        if (existingUser) return res.status(400).json({ error: 'El Nickname ya está en uso' });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+        res.status(201).json({ message: 'Cuenta creada', user: { username: newUser.username, points: newUser.points, victories: newUser.victories } });
+    } catch (error) { res.status(500).json({ error: 'Error del servidor BD' }); }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
+        res.status(200).json({ message: 'Login exitoso', user: { username: user.username, points: user.points, victories: user.victories } });
+    } catch (error) { res.status(500).json({ error: 'Error del servidor BD' }); }
+});
 
 const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
@@ -146,7 +185,8 @@ const sanitizeRoom = (room) => {
     return {
         id: room.id, 
         hostId: room.players[0]?.id, 
-        players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered })),
+        // Agregamos 'inLobby' para saber quién sigue en la sala de resultados
+        players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered, inLobby: p.inLobby })),
         spectators: room.spectators.map(s => ({ id: s.id, name: s.name })), 
         topDiscard: room.discardPile[room.discardPile.length - 1] || null, 
         turnId: room.players[room.turnIndex]?.id, 
@@ -158,7 +198,7 @@ const sanitizeRoom = (room) => {
         turnTime: room.turnTime, 
         state: room.state, 
         startingPlayerId: room.startingPlayerId, 
-        kickVotes: room.kickVotes,
+        history: room.history,
         timerExpires: room.timerExpires
     };
 };
@@ -226,16 +266,58 @@ const nextTurn = (roomId) => {
     io.to(roomId).emit('update_game', sanitizeRoom(room));
 };
 
-const forceGameOver = (roomId) => {
+// ================= ALGORITMO DE DESEMPATE MATEMÁTICO =================
+const forceGameOver = async (roomId, knockerId) => {
     const room = rooms[roomId];
     if (!room) return;
     clearTimeout(room.turnTimer);
+    
+    room.state = 'finished'; // Evita interacciones residuales
+    room.players.forEach(p => p.inLobby = false); // Todos pasan a modo "Viendo resultados"
+
     const scores = room.players.map(p => {
         let finalScore = p.surrendered ? getOptimalFinalScore(p.hand, room.exposedGroups) + 20 : getOptimalFinalScore(p.hand, room.exposedGroups);
-        return { name: p.name, score: finalScore, character: p.character, finalHand: p.hand };
+        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: p.hand, turnDiff: 0 };
     });
-    scores.sort((a, b) => a.score - b.score);
-    io.to(roomId).emit('game_over', { scores, knocker: 'Mesa Cerrada', winner: scores[0].name, wasVolteado: false });
+
+    let knockerName = 'Mesa Cerrada';
+    let wasVolteado = false;
+
+    if (knockerId) {
+        let knockerIndex = room.players.findIndex(p => p.id === knockerId);
+        if (knockerIndex > -1) {
+            knockerName = room.players[knockerIndex].name;
+            // Calcular distancia matemática del turno para el desempate
+            scores.forEach(s => {
+                let pIndex = room.players.findIndex(p => p.id === s.id);
+                s.turnDiff = (pIndex - knockerIndex + room.players.length) % room.players.length;
+            });
+        }
+    }
+
+    // Ordenar primero por Score, luego por Distancia de Turno
+    scores.sort((a, b) => {
+        if (a.score === b.score) return a.turnDiff - b.turnDiff;
+        return a.score - b.score;
+    });
+
+    const winner = scores[0];
+    if (knockerId && winner.id !== knockerId) wasVolteado = true;
+
+    // Historial
+    room.history.push({
+        winner: winner.name, score: winner.score, hand: winner.finalHand, wasVolteado: wasVolteado
+    });
+
+    // Guardado BD
+    try {
+        if (mongoose.connection.readyState === 1) {
+            await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } });
+        }
+    } catch (error) { console.error("Error BD Recompensas:", error); }
+
+    io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado });
+    io.to(roomId).emit('update_lobby', sanitizeRoom(room)); // Actualiza los status tags en segundo plano
 };
 
 const handleLeaveRoom = (socket, roomId) => {
@@ -257,7 +339,9 @@ const handleLeaveRoom = (socket, roomId) => {
                 if (room.players.length < 2) {
                     clearTimeout(room.turnTimer);
                     room.state = 'waiting';
-                    io.to(roomId).emit('returned_to_lobby', sanitizeRoom(room));
+                    room.players.forEach(p => p.inLobby = true);
+                    io.to(roomId).emit('force_to_lobby');
+                    io.to(roomId).emit('update_lobby', sanitizeRoom(room));
                 } else {
                     if (room.turnIndex === idx) {
                         room.turnIndex = room.turnIndex % room.players.length;
@@ -269,6 +353,12 @@ const handleLeaveRoom = (socket, roomId) => {
                     io.to(roomId).emit('update_game', sanitizeRoom(room));
                 }
             } else {
+                // Si alguien se va, checar si todos los que quedan ya están en el lobby
+                if (room.state === 'finished' && room.players.every(p => p.inLobby)) {
+                    room.state = 'waiting';
+                    room.deck = []; room.discardPile = []; room.exposedGroups = [];
+                    room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
+                }
                 io.to(roomId).emit('update_lobby', sanitizeRoom(room));
             }
         }
@@ -289,11 +379,11 @@ io.on('connection', (socket) => {
             const existingPlayer = room.players.find(p => p.name === name);
             const existingSpectator = room.spectators.find(s => s.name === name);
 
-            if (room.state === 'playing') {
+            if (room.state === 'playing' || room.state === 'finished') {
                 if (existingPlayer) {
                     existingPlayer.id = socket.id; socket.join(roomId);
                     socket.emit('room_joined', { roomId });
-                    socket.emit('update_hand', existingPlayer.hand); 
+                    if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
                     return io.to(roomId).emit('update_game', sanitizeRoom(room));
                 } else if (existingSpectator) {
                     existingSpectator.id = socket.id; socket.join(roomId);
@@ -308,10 +398,10 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (existingPlayer && room.state === 'waiting') return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso.');
+            if (existingPlayer) return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso.');
             if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
 
-            room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0 });
+            room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true });
             socket.join(roomId); socket.emit('room_joined', { roomId }); 
             io.to(roomId).emit('update_lobby', sanitizeRoom(room));
             broadcastPublicRooms();
@@ -322,8 +412,8 @@ io.on('connection', (socket) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = {
             id: roomId, 
-            players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0 }],
-            spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [],
+            players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true }],
+            spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [],
             maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, kickVotes: [], turnTimer: null, timerExpires: 0
         };
         socket.join(roomId); socket.emit('room_joined', { roomId }); 
@@ -368,14 +458,17 @@ io.on('connection', (socket) => {
         if (!room) return;
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
-            if (!player.character) return socket.emit('error_msg', '⚠️ Selecciona un personaje primero.');
+            if (!player.character) return socket.emit('error_msg', '⚠️ Selecciona un sombrero primero.');
             player.ready = !player.ready; io.to(roomId).emit('update_lobby', sanitizeRoom(room));
         }
     });
 
     socket.on('start_game', (roomId) => {
         const room = rooms[roomId];
-        if (!room || room.players[0].id !== socket.id || !room.players.every(p => p.ready) || room.players.length < 2) return;
+        // Bloqueo: No iniciar si hay jugadores aún viendo resultados (inLobby = false)
+        if (!room || room.players[0].id !== socket.id || !room.players.every(p => p.ready && p.inLobby) || room.players.length < 2) {
+            return socket.emit('error_msg', '⚠️ Todos deben estar listos y en el lobby para iniciar.');
+        }
 
         room.state = 'playing'; room.deck = createDeck(room.jokerCount);
         room.discardPile = []; room.exposedGroups = []; room.kickVotes = [];
@@ -383,7 +476,7 @@ io.on('connection', (socket) => {
         room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId);
         if (room.turnIndex === -1) room.turnIndex = 0;
 
-        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.lastMsg = ''; p.msgCount = 0; p.mutedUntil = 0; });
+        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.lastMsg = ''; p.msgCount = 0; p.mutedUntil = 0; p.inLobby = false; });
         room.players[room.turnIndex].hand.push(room.deck.pop()); 
         
         room.players.forEach(p => { io.to(p.id).emit('update_hand', p.hand); });
@@ -400,54 +493,35 @@ io.on('connection', (socket) => {
         if (player && !player.surrendered) {
             player.surrendered = true; room.discardPile.push(...player.hand); player.hand = [];
             let activePlayers = room.players.filter(p => !p.surrendered);
-            if (activePlayers.length <= 1) { forceGameOver(roomId); } 
+            if (activePlayers.length <= 1) { forceGameOver(roomId, null); } 
             else { if (room.players[room.turnIndex].id === socket.id) nextTurn(roomId); else io.to(roomId).emit('update_game', sanitizeRoom(room)); }
         }
     });
 
-    socket.on('vote_kick_player', (roomId) => {
-        const room = rooms[roomId];
-        if (!room || room.state !== 'playing') return;
-        if (room.players.length < 3) return socket.emit('error_msg', '⚠️ Se requieren al menos 3 jugadores en la mesa para expulsar a alguien.');
-        const activePlayer = room.players[room.turnIndex];
-        if (!activePlayer) return;
-
-        if (room.kickVotes.includes(socket.id)) return socket.emit('error_msg', '⚠️ Ya votaste.');
-        room.kickVotes.push(socket.id);
-
-        const requiredVotes = room.players.length - 1; 
-        if (room.kickVotes.length >= requiredVotes) {
-            io.to(roomId).emit('error_msg', `🚨 Expulsado: ${activePlayer.name}`);
-            room.players.splice(room.turnIndex, 1); room.kickVotes = [];
-            if (room.players.length < 2) {
-                clearTimeout(room.turnTimer);
-                room.state = 'waiting'; io.to(roomId).emit('returned_to_lobby', sanitizeRoom(room));
-                broadcastPublicRooms();
-            } else {
-                room.turnIndex = room.turnIndex % room.players.length; room.phase = 'draw'; 
-                startTurnTimer(roomId); 
-                io.to(roomId).emit('update_game', sanitizeRoom(room));
-            }
-        } else { io.to(roomId).emit('update_game', sanitizeRoom(room)); }
-    });
-
-    socket.on('request_back_to_lobby', (roomId) => {
+    // RETORNO INDIVIDUAL AL LOBBY
+    socket.on('return_individual_lobby', (roomId) => {
         const room = rooms[roomId];
         if (!room) return;
-        clearTimeout(room.turnTimer);
-        
-        while (room.spectators.length > 0 && room.players.length < room.maxPlayers) {
-            const spec = room.spectators.shift();
-            room.players.push({ id: spec.id, name: spec.name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0 });
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.inLobby = true;
+            socket.emit('force_to_lobby'); // Manda a este jugador específico al lobby
+            
+            // Si TODOS volvieron al lobby, limpiar los datos para la siguiente ronda
+            if (room.players.every(p => p.inLobby)) {
+                room.state = 'waiting';
+                while (room.spectators.length > 0 && room.players.length < room.maxPlayers) {
+                    const spec = room.spectators.shift();
+                    room.players.push({ id: spec.id, name: spec.name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true });
+                }
+                room.deck = []; room.discardPile = []; room.exposedGroups = [];
+                room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
+            }
+            
+            // Actualiza visualmente el estado del lobby para todos
+            io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+            broadcastPublicRooms();
         }
-
-        room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = [];
-        room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
-        
-        // ¡LA SOLUCIÓN A LA PANTALLA CONGELADA! Emitir ambos eventos para limpiar UI.
-        io.to(roomId).emit('returned_to_lobby', sanitizeRoom(room));
-        io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-        broadcastPublicRooms();
     });
 
     socket.on('draw_card', ({ roomId, source }) => {
@@ -570,7 +644,7 @@ io.on('connection', (socket) => {
         
         if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ No puedes golpear sin tener al menos un juego válido.');
 
-        forceGameOver(roomId);
+        forceGameOver(roomId, socket.id); 
     });
 
     socket.on('send_chat', ({ roomId, msg }) => {
