@@ -3,7 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // <-- Usando la versión segura para Render
+const bcrypt = require('bcryptjs'); // Usamos la versión segura para Render
 
 const app = express();
 const server = http.createServer(app);
@@ -309,6 +309,7 @@ const forceGameOver = async (roomId, knockerId) => {
 
     try {
         if (mongoose.connection.readyState === 1) {
+            // Esto fallará silenciosamente (sin crashear) si el ganador es un usuario invitado que no existe en la BD.
             await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } });
         }
     } catch (error) { console.error("Error BD Recompensas:", error); }
@@ -394,7 +395,7 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (existingPlayer) return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso.');
+            if (existingPlayer) return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso en esta mesa.');
             if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
 
             room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true });
