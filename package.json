@@ -1,6 +1,15 @@
 {
+  "name": "saloon-golpeado",
+  "version": "1.0.0",
+  "description": "Juego de cartas multijugador",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "express": "^5.2.1",
-    "socket.io": "^4.8.3"
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.1",
+    "socket.io": "^4.7.5"
   }
 }
