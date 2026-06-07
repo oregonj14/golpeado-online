@@ -13,12 +13,17 @@ app.use(express.json());
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.use(express.static(__dirname));
 
-// CONEXIÓN A MONGODB EN LA NUBE (O Local si lo pruebas en tu PC)
+// CONEXIÓN A MONGODB EN LA NUBE
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saloon_golpeado';
+
+console.log("💡 ESTADO DE LA VARIABLE EN RENDER:", process.env.MONGODB_URI ? "✅ ¡Sí la está leyendo!" : "❌ NO EXISTE O ESTÁ MAL ESCRITA");
+
 mongoose.connect(MONGO_URI)
     .then(() => console.log('📦 Base de Datos MongoDB Conectada con éxito'))
-    .catch(err => console.warn('⚠️ MongoDB no detectado. El juego funcionará en RAM temporal.'));
-
+    .catch(err => {
+        console.warn('⚠️ MongoDB no detectado. El juego funcionará en RAM temporal.');
+        console.error('🕵️‍♂️ CAUSA EXACTA DEL RECHAZO:', err.message);
+    });
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
