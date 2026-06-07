@@ -37,7 +37,10 @@ app.post('/api/register', async (req, res) => {
         const newUser = new User({ username, password: hashedPassword });
         await newUser.save();
         res.status(201).json({ message: 'Cuenta creada con éxito', user: { username: newUser.username, points: newUser.points, victories: newUser.victories } });
-    } catch (error) { res.status(500).json({ error: 'Error del servidor BD' }); }
+    } catch (error) { 
+        console.error("🔥 ERROR EN BD (Registro):", error); // <-- ESTO NOS DIRÁ EL PROBLEMA REAL
+        res.status(500).json({ error: 'Error del servidor BD. Revisa los Logs de Render.' }); 
+    }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -48,7 +51,10 @@ app.post('/api/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
         res.status(200).json({ message: 'Login exitoso', user: { username: user.username, points: user.points, victories: user.victories } });
-    } catch (error) { res.status(500).json({ error: 'Error del servidor BD' }); }
+    } catch (error) { 
+        console.error("🔥 ERROR EN BD (Login):", error);
+        res.status(500).json({ error: 'Error del servidor BD. Revisa los Logs de Render.' }); 
+    }
 });
 
 const rooms = {};
