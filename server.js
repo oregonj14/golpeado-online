@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -30,7 +29,7 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     victories: { type: Number, default: 0 },
     points: { type: Number, default: 0 },
-    unlockedChars: { type: [String], default: ['🤠', '🤖', '💀', '🦊', '🦁'] },
+    unlockedChars: { type: [String], default: ['🤠', '🤖', '💀', '🦊', '🦁'] }, // 5 iguales para todos por defecto
     activeEffect: { type: String, default: '' },
     unlockedEffects: { type: [String], default: [] }
 });
@@ -90,7 +89,7 @@ app.post('/api/buy', async (req, res) => {
             user.unlockedChars.push(item);
         } else {
             user.unlockedEffects.push(item);
-            user.activeEffect = item; // Se equipa automáticamente al comprarlo
+            user.activeEffect = item;
         }
         
         await user.save();
@@ -98,7 +97,7 @@ app.post('/api/buy', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Error en la transacción' }); }
 });
 
-// --- 4. LÓGICA DEL JUEGO (MECÁNICAS Y CARTAS) ---
+// --- 4. LÓGICA COMPLETA DEL JUEGO (MECÁNICAS Y CARTAS) ---
 const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -262,7 +261,7 @@ const startTurnTimer = (roomId) => {
     room.timerExpires = Date.now() + ms;
     
     room.turnTimer = setTimeout(() => {
-        try { executeAutoPlay(roomId); } catch (e) { console.error("Error AutoPlay:", e); }
+        try { executeAutoPlay(roomId); } catch (e) { console.error(e); }
     }, ms);
 };
 
@@ -351,15 +350,22 @@ const forceGameOver = async (roomId, knockerId) => {
     const winner = scores[0];
     if (knockerId && winner.id !== knockerId) wasVolteado = true;
 
+    // GUARDAMOS HISTORIAL DETALLADO CON LAS CARTAS DE TODOS LOS JUGADORES
+    const allHandsData = room.players.map(p => ({
+        name: p.name,
+        character: p.character || '🤠',
+        hand: p.hand
+    }));
+
     room.history.push({
-        winner: winner.name, score: winner.score, hand: winner.finalHand, wasVolteado: wasVolteado
+        winner: winner.name, score: winner.score, hand: winner.finalHand, wasVolteado: wasVolteado, allHands: allHandsData
     });
 
     try {
         if (mongoose.connection.readyState === 1) {
             await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } });
         }
-    } catch (error) { console.error("Error BD Recompensas:", error); }
+    } catch (error) { console.error(error); }
 
     io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado });
     io.to(roomId).emit('update_lobby', sanitizeRoom(room)); 
@@ -411,46 +417,43 @@ const handleLeaveRoom = (socket, roomId) => {
     return changed;
 };
 
-// --- 5. SOCKET.IO (COMUNICACIÓN EN TIEMPO REAL) ---
+// --- 5. ENLACE DE Sockets COMPLETO ---
 io.on('connection', (socket) => {
     
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
 
     socket.on('join_room', ({ roomId, name, activeEffect }) => {
-        try {
-            let room = rooms[roomId];
-            if (!room) return socket.emit('error_msg', '⚠️ El código de sala no existe.');
-            
-            const existingPlayer = room.players.find(p => p.name === name);
-            const existingSpectator = room.spectators.find(s => s.name === name);
+        let room = rooms[roomId];
+        if (!room) return socket.emit('error_msg', '⚠️ La mesa no existe.');
+        
+        const existingPlayer = room.players.find(p => p.name === name);
+        const existingSpectator = room.spectators.find(s => s.name === name);
 
-            if (room.state === 'playing' || room.state === 'finished') {
-                if (existingPlayer) {
-                    existingPlayer.id = socket.id; socket.join(roomId);
-                    socket.emit('room_joined', { roomId });
-                    if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
-                    return io.to(roomId).emit('update_game', sanitizeRoom(room));
-                } else if (existingSpectator) {
-                    existingSpectator.id = socket.id; socket.join(roomId);
-                    socket.emit('room_joined', { roomId });
-                    return io.to(roomId).emit('update_game', sanitizeRoom(room));
-                } else {
-                    room.spectators.push({ id: socket.id, name, character: '👀', lastMsg: '', msgCount: 0, mutedUntil: 0 });
-                    socket.join(roomId);
-                    socket.emit('room_joined', { roomId });
-                    broadcastPublicRooms();
-                    return io.to(roomId).emit('update_game', sanitizeRoom(room));
-                }
+        if (room.state === 'playing' || room.state === 'finished') {
+            if (existingPlayer) {
+                existingPlayer.id = socket.id; socket.join(roomId);
+                socket.emit('room_joined', { roomId });
+                if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
+                return io.to(roomId).emit('update_game', sanitizeRoom(room));
+            } else if (existingSpectator) {
+                existingSpectator.id = socket.id; socket.join(roomId);
+                socket.emit('room_joined', { roomId });
+                return io.to(roomId).emit('update_game', sanitizeRoom(room));
+            } else {
+                room.spectators.push({ id: socket.id, name, character: '👀', lastMsg: '', msgCount: 0, mutedUntil: 0 });
+                socket.join(roomId); socket.emit('room_joined', { roomId });
+                broadcastPublicRooms();
+                return io.to(roomId).emit('update_game', sanitizeRoom(room));
             }
+        }
 
-            if (existingPlayer) return socket.emit('error_msg', '⚠️ Ese nickname ya está en uso en esta mesa.');
-            if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Sala llena.');
+        if (existingPlayer) return socket.emit('error_msg', '⚠️ Nickname ocupado en esta mesa.');
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ La mesa está llena.');
 
-            room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '' });
-            socket.join(roomId); socket.emit('room_joined', { roomId }); 
-            io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-            broadcastPublicRooms();
-        } catch(e) { console.error(e); }
+        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '' });
+        socket.join(roomId); socket.emit('room_joined', { roomId }); 
+        io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+        broadcastPublicRooms();
     });
 
     socket.on('create_room', ({ name, activeEffect }) => {
@@ -459,7 +462,7 @@ io.on('connection', (socket) => {
             id: roomId, 
             players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '' }],
             spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [],
-            maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, kickVotes: [], turnTimer: null, timerExpires: 0
+            maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, kickVotes: [], turnTimer: null
         };
         socket.join(roomId); socket.emit('room_joined', { roomId }); 
         io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId]));
@@ -474,36 +477,18 @@ io.on('connection', (socket) => {
         broadcastPublicRooms();
     });
 
-    socket.on('leave_room', (roomId) => {
-        if (handleLeaveRoom(socket, roomId)) {
-            socket.leave(roomId);
-            socket.emit('left_room');
-            broadcastPublicRooms();
-        }
-    });
-
-    socket.on('disconnect', () => {
-        let changed = false;
-        for (let roomId in rooms) {
-            if (handleLeaveRoom(socket, roomId)) { changed = true; }
-        }
-        if(changed) broadcastPublicRooms();
-    });
-
     socket.on('select_character', ({ roomId, character }) => {
-        const room = rooms[roomId];
-        if (!room) return;
+        const room = rooms[roomId]; if (!room) return;
         if (room.players.some(p => p.character === character)) return socket.emit('error_msg', '⚠️ Personaje ocupado.');
         const player = room.players.find(p => p.id === socket.id);
         if (player) { player.character = character; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
     });
 
     socket.on('toggle_ready', (roomId) => {
-        const room = rooms[roomId];
-        if (!room) return;
+        const room = rooms[roomId]; if (!room) return;
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
-            if (!player.character) return socket.emit('error_msg', '⚠️ Selecciona un sombrero primero.');
+            if (!player.character) return socket.emit('error_msg', '⚠️ Elige un personaje primero.');
             player.ready = !player.ready; io.to(roomId).emit('update_lobby', sanitizeRoom(room));
         }
     });
@@ -511,7 +496,7 @@ io.on('connection', (socket) => {
     socket.on('start_game', (roomId) => {
         const room = rooms[roomId];
         if (!room || room.players[0].id !== socket.id || !room.players.every(p => p.ready && p.inLobby) || room.players.length < 2) {
-            return socket.emit('error_msg', '⚠️ Todos deben estar listos y en el lobby para iniciar.');
+            return socket.emit('error_msg', '⚠️ Todos deben estar listos en la mesa para iniciar.');
         }
 
         room.state = 'playing'; room.deck = createDeck(room.jokerCount);
@@ -520,7 +505,7 @@ io.on('connection', (socket) => {
         room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId);
         if (room.turnIndex === -1) room.turnIndex = 0;
 
-        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.lastMsg = ''; p.msgCount = 0; p.mutedUntil = 0; p.inLobby = false; });
+        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.inLobby = false; });
         room.players[room.turnIndex].hand.push(room.deck.pop()); 
         
         room.players.forEach(p => { io.to(p.id).emit('update_hand', p.hand); });
@@ -531,8 +516,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('surrender_hand', (roomId) => {
-        const room = rooms[roomId];
-        if (!room || room.state !== 'playing') return;
+        const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
         const player = room.players.find(p => p.id === socket.id);
         if (player && !player.surrendered) {
             player.surrendered = true; room.discardPile.push(...player.hand); player.hand = [];
@@ -542,32 +526,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('return_individual_lobby', (roomId) => {
-        const room = rooms[roomId];
-        if (!room) return;
-        const player = room.players.find(p => p.id === socket.id);
-        if (player) {
-            player.inLobby = true;
-            socket.emit('force_to_lobby'); 
-            
-            if (room.players.every(p => p.inLobby)) {
-                room.state = 'waiting';
-                while (room.spectators.length > 0 && room.players.length < room.maxPlayers) {
-                    const spec = room.spectators.shift();
-                    room.players.push({ id: spec.id, name: spec.name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: '' });
-                }
-                room.deck = []; room.discardPile = []; room.exposedGroups = [];
-                room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
-            }
-            
-            io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-            broadcastPublicRooms();
-        }
-    });
-
     socket.on('draw_card', ({ roomId, source }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
 
         if (source === 'deck') {
@@ -575,7 +535,7 @@ io.on('connection', (socket) => {
                 if (room.discardPile.length > 1) {
                     const topDiscard = room.discardPile.pop();
                     room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard];
-                } else { return socket.emit('error_msg', '⚠️ No hay más cartas.'); }
+                } else { return socket.emit('error_msg', '⚠️ No quedan cartas en el mazo.'); }
             }
             let card = room.deck.pop();
             if (card) {
@@ -585,41 +545,30 @@ io.on('connection', (socket) => {
         }
     });
 
-    // LÓGICA DE JOKER FLEXIBLE INCLUIDA
     socket.on('pick_discard_with_meld', ({ roomId, selectedIds, jokerRank }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
 
-        let topCard = room.discardPile[room.discardPile.length - 1];
-        if (!topCard) return;
-
+        let topCard = room.discardPile[room.discardPile.length - 1]; if (!topCard) return;
         let cardsForMeld = player.hand.filter(c => selectedIds.includes(c.id));
         
-        // Asignamos el valor que el usuario escogió para el Joker
         cardsForMeld.forEach(c => {
-            if (c.rank === 'Joker' && jokerRank) {
-                c.rank = jokerRank;
-                c.value = getCardValue(jokerRank);
-            }
+            if (c.rank === 'Joker' && jokerRank) { c.rank = jokerRank; c.value = getCardValue(jokerRank); }
         });
-
         cardsForMeld.push(topCard);
 
-        if (cardsForMeld.length > 4) return socket.emit('error_msg', '⚠️ Un grupo no puede tener más de 4 cartas.');
+        if (cardsForMeld.length > 4) return socket.emit('error_msg', '⚠️ Un grupo no puede exceder las 4 cartas.');
 
         if (isValidMelding(cardsForMeld)) {
-            room.discardPile.pop();
-            player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
+            room.discardPile.pop(); player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard';
             socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-        } else { socket.emit('error_msg', '⚠️ ¡Combinación Inválida con ese valor!'); }
+        } else { socket.emit('error_msg', '⚠️ Combinación Inválida en mesa.'); }
     });
 
     socket.on('discard', ({ roomId, cardId }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
@@ -631,12 +580,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('plug_card', ({ roomId, groupId, cardId }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
         const group = room.exposedGroups.find(g => g.id === groupId);
-        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ El grupo ya tiene el máximo de 4 cartas.');
+        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ Grupo completo (Máx 4).');
 
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
         if (group && cardIdx > -1) {
@@ -644,35 +592,30 @@ io.on('connection', (socket) => {
             if (canPlugIn(group.cards, card)) {
                 player.hand.splice(cardIdx, 1); group.cards.push(card);
                 socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-            } else { socket.emit('error_msg', '⚠️ No engancha aquí.'); }
+            } else { socket.emit('error_msg', '⚠️ Esta carta no engancha aquí.'); }
         }
     });
 
     socket.on('unplug_card', ({ roomId, groupId, cardId }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
-        const groupIdx = room.exposedGroups.findIndex(g => g.id === groupId);
-        if (groupIdx === -1) return;
+        const groupIdx = room.exposedGroups.findIndex(g => g.id === groupId); if (groupIdx === -1) return;
         const group = room.exposedGroups[groupIdx];
 
         const cardIdx = group.cards.findIndex(c => c.id === cardId);
         if (cardIdx > -1) {
-            const card = group.cards.splice(cardIdx, 1)[0];
-            player.hand.push(card);
+            const card = group.cards.splice(cardIdx, 1)[0]; player.hand.push(card);
 
             if (group.cards.length < 3 || !isValidMelding(group.cards)) {
-                player.hand.push(...group.cards);
-                room.exposedGroups.splice(groupIdx, 1);
+                player.hand.push(...group.cards); room.exposedGroups.splice(groupIdx, 1);
             }
             socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
     });
 
     socket.on('reorder_hand', ({ roomId, newOrder }) => {
-        const room = rooms[roomId];
-        if (!room || room.state !== 'playing') return;
+        const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
             player.hand.sort((a, b) => {
@@ -683,52 +626,49 @@ io.on('connection', (socket) => {
     });
 
     socket.on('knock', (roomId) => {
-        const room = rooms[roomId];
-        const knocker = room.players.find(p => p.id === socket.id);
+        const room = rooms[roomId]; const knocker = room.players.find(p => p.id === socket.id);
         if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
 
-        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear al inicio de tu turno, ANTES de robar.');
-        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Tu turno terminó mal, no puedes golpear ahora.');
+        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear antes de robar tu carta.');
+        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Exceso de cartas, no puedes golpear.');
 
         let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
         let hasInHand = hasValidGroup(knocker.hand);
         
-        if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ No puedes golpear sin tener al menos un juego válido.');
+        if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ No puedes golpear sin juegos organizados.');
 
         forceGameOver(roomId, socket.id); 
     });
 
     socket.on('send_chat', ({ roomId, msg }) => {
-        const room = rooms[roomId];
-        if (!room) return;
+        const room = rooms[roomId]; if (!room) return;
         let player = room.players.find(p => p.id === socket.id) || room.spectators.find(s => s.id === socket.id);
         if (!player) return;
-
-        if (Date.now() < player.mutedUntil) {
-            const left = Math.ceil((player.mutedUntil - Date.now()) / 1000);
-            return socket.emit('error_msg', `🔇 Estás silenciado. Espera ${left}s.`);
-        }
-
-        if (player.lastMsg === msg) { player.msgCount++; } 
-        else { player.lastMsg = msg; player.msgCount = 1; }
-
-        if (player.msgCount >= 5) {
-            player.mutedUntil = Date.now() + 10000; player.msgCount = 0;
-            return socket.emit('error_msg', '🚫 Has sido silenciado por 10 segundos por hacer spam.');
-        }
-
-        io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character || '👀' });
+        io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character || '🤠' });
     });
 
     socket.on('taunt_card', ({ roomId, cardId }) => {
-        const room = rooms[roomId];
-        const player = room.players.find(p => p.id === socket.id);
-        if (!room || !player) return;
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
         const card = player.hand.find(c => c.id === cardId);
         if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
     });
 
+    socket.on('return_individual_lobby', (roomId) => {
+        const room = rooms[roomId]; if (!room) return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.inLobby = true; socket.emit('force_to_lobby'); 
+            if (room.players.every(p => p.inLobby)) {
+                room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = [];
+                room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
+            }
+            io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+        }
+    });
+
+    socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
+    socket.on('disconnect', () => { for (let rId in rooms) { handleLeaveRoom(socket, rId); } broadcastPublicRooms(); });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
