@@ -56,9 +56,37 @@ app.post('/api/login', async (req, res) => {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
         if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
+        
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
-        res.status(200).json({ message: 'Login exitoso', user: { username: user.username, points: user.points, victories: user.victories, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect } });
+
+        // 🛠️ PARCHE DE SEGURIDAD PARA CUENTAS VIEJAS (Como 'Enel')
+        // Si la cuenta tiene menos de los 5 personajes iniciales obligatorios, se los activamos
+        const personajesIniciales = ['🤠', '🤖', '💀', '🦊', '🦁'];
+        let actualizoInventario = false;
+
+        personajesIniciales.forEach(char => {
+            if (!user.unlockedChars.includes(char)) {
+                user.unlockedChars.push(char);
+                actualizoInventario = true;
+            }
+        });
+
+        if (actualizoInventario) {
+            await user.save(); // Guardamos los cambios en MongoDB para siempre
+            console.log(`🔧 Cuenta antigua '${user.username}' actualizada con los 5 personajes iniciales.`);
+        }
+
+        res.status(200).json({ 
+            message: 'Login exitoso', 
+            user: { 
+                username: user.username, 
+                points: user.points, 
+                victories: user.victories, 
+                unlockedChars: user.unlockedChars, 
+                activeEffect: user.activeEffect 
+            } 
+        });
     } catch (error) { 
         console.error("🔥 ERROR EN BD (Login):", error);
         res.status(500).json({ error: 'Error del servidor BD.' }); 
