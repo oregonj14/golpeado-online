@@ -3,117 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Golpeado: Saloon Edition</title>
+    <title>Golpeado: Ciber-Saloon Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #3d2314 0%, #1a0f08 100%); color: white; text-align: center; margin: 0; padding: 0; height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-        .western-title { font-family: 'Rye', cursive; color: #f1c40f; text-shadow: 2px 2px 5px black; font-size: 2.2rem; margin: 10px 0;}
-        .container { max-width: 600px; margin: 2vh auto; background: rgba(20, 10, 5, 0.85); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; border: 1px solid #d4af37; box-shadow: 0 8px 30px rgba(0,0,0,0.9); width: 90%; max-height: 95vh; overflow-y: auto; }
+        /* --- CONFIGURACIÓN DE COLORES Y ESTILO CIBER-SALOON --- */
+        :root {
+            --bg-dark: #06060c;
+            --cyan-neon: #00f2ff;
+            --magenta-neon: #ff00ff;
+            --glass: rgba(20, 15, 35, 0.75);
+            --border-glass: rgba(0, 242, 255, 0.15);
+        }
+
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: radial-gradient(circle at center, #131124 0%, var(--bg-dark) 100%);
+            color: white; text-align: center; margin: 0; padding: 0; 
+            height: 100vh; height: 100dvh; overflow: hidden; 
+            display: flex; flex-direction: column; 
+        }
+        
+        .western-title { 
+            font-family: 'Rye', cursive; 
+            color: white; 
+            text-shadow: 0 0 8px var(--cyan-neon), 0 0 20px var(--cyan-neon); 
+            font-size: 2.2rem; margin: 10px 0;
+        }
+        
+        .container { 
+            max-width: 600px; margin: 2vh auto; 
+            background: var(--glass); 
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            padding: 20px; border-radius: 20px; 
+            border: 1px solid var(--border-glass); 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.7), inset 0 0 15px rgba(0, 242, 255, 0.05);
+            width: 90%; max-height: 95vh; overflow-y: auto; 
+        }
         
         input, select, button { padding: 10px; margin: 6px 0; border: none; border-radius: 5px; font-size: 15px; font-weight: bold; }
-        input, select { width: 80%; background-color: #ecf0f1; color: black; box-sizing: border-box; }
-        button { background: linear-gradient(to bottom, #d4af37, #aa7f18); border: 1px solid #fff; color: #3e2700; cursor: pointer; width: 85%; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        button:hover { filter: brightness(1.2); transform: scale(1.02); }
+        input, select { width: 80%; background-color: #1a192e; color: #fff; border: 1px solid var(--border-glass); box-sizing: border-box; }
+        input:focus, select:focus { outline: none; border-color: var(--cyan-neon); box-shadow: 0 0 10px var(--cyan-neon); }
+        
+        button { 
+            background: transparent; 
+            border: 1px solid var(--cyan-neon); 
+            color: var(--cyan-neon); 
+            cursor: pointer; width: 85%; 
+            transition: all 0.3s ease; 
+            text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 0 8px rgba(0, 242, 255, 0.2);
+        }
+        button:hover { 
+            background: var(--cyan-neon); 
+            color: black; 
+            box-shadow: 0 0 20px var(--cyan-neon); 
+            transform: translateY(-2px);
+        }
         .hidden { display: none !important; }
         
         .pwd-container { position: relative; width: 80%; margin: 6px auto; }
         .pwd-container input { width: 100%; padding-right: 40px; box-sizing: border-box; margin: 0;}
-        .eye-icon { position: absolute; right: 10px; top: 10px; cursor: pointer; font-size: 16px; user-select: none; }
+        .eye-icon { position: absolute; right: 10px; top: 10px; cursor: pointer; font-size: 16px; user-select: none; color: var(--cyan-neon); }
         
         .char-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
-        .char-btn { background: #5c3a21; border: 2px solid #3d2314; border-radius: 10px; padding: 5px; font-size: 24px; cursor: pointer; }
-        .char-btn.my-selection { border-color: #f1c40f; background: #c0392b; box-shadow: 0 0 15px #f1c40f; }
+        .char-btn { background: #16152b; border: 1px solid var(--border-glass); border-radius: 10px; padding: 5px; font-size: 24px; cursor: pointer; color: white;}
+        .char-btn.my-selection { border-color: var(--magenta-neon); background: rgba(255, 0, 255, 0.2); box-shadow: 0 0 15px var(--magenta-neon); }
         
-        /* EFECTOS DE TIENDA */
-        .glow-gold { text-shadow: 0 0 10px gold, 0 0 20px #b8860b; color: #fff8dc !important; font-weight: bold; }
-        .glow-neon { text-shadow: 0 0 10px cyan, 0 0 20px blue; color: #e0ffff !important; font-weight: bold; }
+        /* RESPLANDORES DE NOMBRE EXCLUSIVOS */
+        .glow-gold { text-shadow: 0 0 10px gold, 0 0 20px #ffaa00; color: #fff8dc !important; font-weight: bold; }
+        .glow-neon { text-shadow: 0 0 10px var(--cyan-neon), 0 0 20px #0055ff; color: #e0ffff !important; font-weight: bold; }
         
-        .room-list-container { background: rgba(0,0,0,0.4); border: 1px solid #aa7f18; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;}
-        .room-item { background: #2c160b; border: 1px solid #5c3a21; border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
+        .room-list-container { background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;}
+        .room-item { background: #111021; border: 1px solid var(--border-glass); border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
         .room-item button { width: auto; margin: 0; padding: 5px 15px; font-size: 12px; }
 
-        .player-list-item { background: rgba(0,0,0,0.5); border-left: 4px solid #f1c40f; margin-bottom: 5px; padding: 8px 12px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
-        .badge-status-lobby { background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
-        .badge-status-waiting { background: #e67e22; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
+        .player-list-item { background: rgba(0,0,0,0.5); border-left: 4px solid var(--cyan-neon); margin-bottom: 5px; padding: 8px 12px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;}
+        .badge-status-lobby { background: #00f2ff; color: black; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
+        .badge-status-waiting { background: #ff00ff; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;}
 
-        .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #aa7f18; }
-        .settings-title { margin: 0 0 10px 0; color: #f1c40f; text-align: center; border-bottom: 1px solid #5c3a21; padding-bottom: 5px; font-size: 14px;}
+        .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid var(--border-glass); }
+        .settings-title { margin: 0 0 10px 0; color: var(--cyan-neon); text-align: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 5px; font-size: 14px;}
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; text-align: left; }
         .setting-item { display: flex; flex-direction: column; }
         .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold; }
-        .setting-item select { width: 100%; padding: 6px; font-size: 12px; background: #2c160b; color: white; border: 1px solid #f1c40f; border-radius: 5px; }
+        .setting-item select { width: 100%; padding: 6px; font-size: 12px; background: #111021; color: white; border: 1px solid var(--cyan-neon); border-radius: 5px; }
 
-        .room-history-container { background: rgba(0,0,0,0.4); border: 1px solid #2980b9; border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 180px; overflow-y: auto; }
+        .room-history-container { background: rgba(0,0,0,0.4); border: 1px solid var(--magenta-neon); border-radius: 8px; padding: 10px; margin-top: 15px; text-align: left; max-height: 180px; overflow-y: auto; }
 
+        /* --- INTERFAZ DE TABLERO PREMIUM CIBER --- */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; overflow: hidden; width: 100%; }
         .poker-table-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; min-height: 40vh;}
-        .poker-table { width: 90%; max-width: 700px; height: 75%; background: radial-gradient(ellipse at center, #2e5c36 0%, #153a1d 100%); border: 15px solid #5c3a21; border-radius: 50%; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 15px 40px rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; position: relative; }
+        
+        .poker-table { 
+            width: 90%; max-width: 700px; height: 75%; 
+            background: radial-gradient(circle, #171533 0%, var(--bg-dark) 100%); 
+            border: 12px solid #16152b; border-radius: 50%; 
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.9), 0 0 40px rgba(0, 242, 255, 0.15); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; position: relative; 
+            transition: transform 0.1s ease;
+        }
+        
+        /* ANIMACIÓN SÍSMICA AL GOLPEAR */
+        .shake-board { animation: shake 0.4s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 5px); }
+            40% { transform: translate(6px, -6px); }
+            60% { transform: translate(-5px, 4px); }
+            80% { transform: translate(4px, -3px); }
+        }
+
         .mat { display: flex; justify-content: center; gap: 15px; }
         
-        .card-back { width: 55px; height: 80px; border-radius: 6px; background: repeating-linear-gradient(45deg, #2c160b, #2c160b 8px, #5c3a21 8px, #5c3a21 16px); border: 2px solid #f1c40f; box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 8px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; }
-        .card-back::after { content: "🃏"; font-size: 22px; background: rgba(0,0,0,0.6); border-radius: 50%; padding: 4px; box-shadow: 0 0 5px #f1c40f; }
-        .deck-slot { width: 55px; height: 80px; border: 2px dashed #f1c40f; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: rgba(0,0,0,0.3); color: #f1c40f; }
+        /* DISEÑO DE CARTAS DIGITALES */
+        .card, .card-back, .deck-slot {
+            width: 55px; height: 80px; border-radius: 8px;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card-back { 
+            background: linear-gradient(135deg, #120d24, #2b113a); 
+            border: 2px solid var(--cyan-neon); 
+            box-shadow: 0 0 12px rgba(0, 242, 255, 0.4); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; 
+        }
+        .card-back::after { content: "⚡"; font-size: 20px; text-shadow: 0 0 8px var(--cyan-neon); color: var(--cyan-neon); }
         
-        .card { width: 55px; height: 80px; background-color: white; color: black; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; box-sizing: border-box; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: grab; touch-action: none; user-select: none; transition: transform 0.1s ease; position: relative; z-index: 10; }
-        .card:hover, .card:active { z-index: 100 !important; cursor: grabbing; transform: scale(1.1) translateY(-10px); }
-        .card.selected { border: 3px solid #f1c40f; transform: translateY(-10px); background-color: #fffae6; box-shadow: 0 0 15px #f1c40f; z-index: 50 !important; }
-        .card.hearts, .card.diamonds { color: #c0392b; } .card.clubs, .card.spades { color: #2c3e50; } .card.joker { color: #8e44ad; background: linear-gradient(135deg, #e0aaff, #fff); }
+        .deck-slot { width: 55px; height: 80px; border: 2px dashed var(--magenta-neon); display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background-color: rgba(0,0,0,0.5); color: var(--magenta-neon); }
+        
+        .card { 
+            background: #ffffff; color: black; 
+            display: flex; flex-direction: column; justify-content: space-between; padding: 5px; box-sizing: border-box; font-weight: bold; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: grab; touch-action: none; user-select: none; position: relative; z-index: 10; 
+        }
+        .card:hover, .card:active { z-index: 100 !important; cursor: grabbing; transform: scale(1.15) translateY(-12px); box-shadow: 0 10px 20px rgba(0,0,0,0.6); }
+        .card.selected { border: 3px solid var(--cyan-neon); transform: translateY(-12px); background-color: #e0ffff; box-shadow: 0 0 15px var(--cyan-neon); z-index: 50 !important; }
+        .card.hearts, .card.diamonds { color: #ff0055; } .card.clubs, .card.spades { color: #1a1c2e; } .card.joker { color: #9c27b0; background: linear-gradient(135deg, #f3e5f5, #e1bee7); border: 2px solid #9c27b0; }
+
+        /* VUELO DIGITAL DE CARTAS EN DESCARTE */
+        .card-flying { transform: scale(0.3) translateY(-200px) rotate(45deg); opacity: 0; pointer-events: none; }
 
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-width: 85%; max-height: 15vh; overflow-y: auto; z-index: 2;}
-        .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 6px; border: 1px solid #f1c40f; cursor: pointer; }
+        .exposed-group { display: inline-flex; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 6px; border: 1px solid var(--magenta-neon); cursor: pointer; box-shadow: 0 0 8px rgba(255, 0, 255, 0.1); }
         
         .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 2; }
         .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
-        .avatar-icon { font-size: 26px; background: #c0392b; border: 2px solid #f1c40f; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
-        .avatar-seat.active-turn .avatar-icon { background: #f1c40f; border-color: white; box-shadow: 0 0 20px #f1c40f; animation: pulse 1.5s infinite; }
-        .avatar-name { background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-top: -6px; border: 1px solid #5c3a21; white-space: nowrap; }
-        .avatar-cards { font-size: 10px; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 5px; margin-top: 2px; }
+        .avatar-icon { font-size: 26px; background: #16152b; border: 2px solid var(--cyan-neon); border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); }
+        .avatar-seat.active-turn .avatar-icon { border-color: var(--magenta-neon); box-shadow: 0 0 20px var(--magenta-neon); animation: pulse 1.5s infinite; }
+        .avatar-name { background: rgba(6,6,12,0.9); padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-top: -6px; border: 1px solid var(--border-glass); white-space: nowrap; }
+        .avatar-cards { font-size: 10px; color: var(--cyan-neon); font-weight: bold; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 5px; margin-top: 2px; }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         .taunt-popup { position: absolute; top: 50%; left: 50%; margin-top:-40px; margin-left:-27px; z-index: 999; pointer-events: none; }
-        .bottom-panel { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; background: linear-gradient(to top, #1a0f08 80%, transparent); padding-bottom: 5px; z-index: 50; }
+        .bottom-panel { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; background: linear-gradient(to top, var(--bg-dark) 85%, transparent); padding-bottom: 5px; z-index: 50; }
         .status-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: 98%; max-width: 700px; margin-bottom: 5px; }
-        .status-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 15px; border: 1px solid #5c3a21; }
+        .status-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 15px; border: 1px solid var(--border-glass); }
         .status-bar button { margin: 0; width: auto; padding: 6px 12px; font-size: 12px; }
-        #localAvatarArea { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 15px; border: 2px solid #f1c40f; position: relative;}
+        
+        #localAvatarArea { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 15px; border: 2px solid var(--cyan-neon); position: relative;}
         #localAvatarArea .avatar-icon { width: 35px; height: 35px; font-size: 18px; margin: 0; border: none; box-shadow: none; background: transparent;}
         #localAvatarArea .avatar-name { background: none; border: none; padding: 0; font-size: 12px; margin: 0; color: white; font-weight: bold; }
+        
         .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 10px 5px; min-height: 90px; width: 95%; max-width: 800px; z-index: 60;}
-        .spectator-banner { background: #d35400; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
+        .spectator-banner { background: #ff00ff; color: white; font-weight: bold; padding: 10px; width: 100%; text-align: center; font-size: 14px; position: absolute; bottom: 0; z-index: 100; box-shadow: 0 -4px 15px rgba(255,0,255,0.3); }
 
-        #chatBox { position: fixed; right: 15px; bottom: 15px; width: 260px; background: rgba(61, 35, 20, 0.95); border: 2px solid #5c3a21; border-radius: 8px; z-index: 9999; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); transition: all 0.3s ease;}
-        .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid #5c3a21; font-size: 12px; color: #f1c40f; position: relative;}
+        /* CHAT FLOTANTE ESTILO HUD */
+        #chatBox { position: fixed; right: 15px; bottom: 15px; width: 260px; background: rgba(15, 12, 28, 0.95); border: 1px solid var(--border-glass); border-radius: 8px; z-index: 9999; display: flex; flex-direction: column; padding: 6px; box-shadow: 0 4px 20px rgba(0,242,255,0.15); transition: all 0.3s ease;}
+        .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid var(--border-glass); font-size: 12px; color: var(--cyan-neon); position: relative;}
         .chat-header h4 { margin: 0; font-family: 'Segoe UI', sans-serif;}
-        .notification-dot { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #e74c3c; border-radius: 50%; box-shadow: 0 0 8px #e74c3c; z-index: 90;}
-        #chatBox.minimized { width: 55px; height: 55px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: linear-gradient(135deg, #d4af37, #aa7f18); border: 2px solid #fff; overflow: hidden;}
-        #chatBox.minimized::before { content: "💬"; font-size: 26px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
+        .notification-dot { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #ff00ff; border-radius: 50%; box-shadow: 0 0 8px #ff00ff; z-index: 90;}
+        #chatBox.minimized { width: 55px; height: 55px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; background: transparent; border: 2px solid var(--cyan-neon); overflow: hidden; box-shadow: 0 0 12px var(--cyan-neon);}
+        #chatBox.minimized::before { content: "💬"; font-size: 24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
         #chatBox.minimized .chat-header h4, #chatBox.minimized #chatToggleIcon, #chatBox.minimized #chatMessages, #chatBox.minimized .chat-input-area, #chatBox.minimized .chat-emotes { display: none; }
-        #chatMessages { flex: 1; max-height: 150px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4; word-wrap: break-word;}
+        #chatMessages { flex: 1; max-height: 150px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; color: #ecf0f1; line-height: 1.4;}
         .chat-input-area { display: flex; gap: 5px; margin-bottom: 5px; }
-        .chat-input-area input { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #aa7f18; font-size: 12px; color: black; background: #ecf0f1; margin:0;}
+        .chat-input-area input { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border-glass); font-size: 12px; color: white; background: #111021; margin:0;}
         .chat-input-area button { width: auto; padding: 6px 10px; margin: 0; font-size: 11px; }
         .chat-emotes { display: flex; gap: 5px; justify-content: center; }
-        .emote-btn { background: #2c160b; border: 1px solid #f1c40f; border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0;}
+        .emote-btn { background: #111021; border: 1px solid var(--border-glass); border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0; color: white;}
 
-        .badge-victory { background:#27ae60; color:white; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 8px #27ae60; text-transform: uppercase; }
-        .badge-volteado { background:#e74c3c; color:white; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 12px #e74c3c; animation: pulseRed 1s infinite; text-transform: uppercase;}
-        @keyframes pulseRed { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-        @media (max-width: 480px) {
-            .poker-table-wrapper { min-height: 35vh; } .poker-table { height: 100%; border-width: 8px; }
-            .card, .deck-slot, .card-back { width: 45px; height: 70px; font-size: 11px; padding: 2px; } .card-back::after { font-size: 20px; padding: 2px; }
-            #chatBox { right: 10px; bottom: 65px; width: 230px; } #chatBox.minimized { width: 50px; height: 50px; } #chatBox.minimized::before { font-size: 22px; }
-            #chatMessages { max-height: 100px; font-size: 11px; } .western-title { font-size: 1.5rem; } .avatar-icon { width: 35px; height: 35px; font-size: 18px; }
-            .status-bar button { font-size: 10px; padding: 5px 8px; } .hand-container { gap: 3px; min-height: 75px; } .settings-grid { grid-template-columns: repeat(2, 1fr); }
-        }
+        .badge-victory { background:#00f2ff; color:black; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 8px var(--cyan-neon); }
+        .badge-volteado { background:#ff00ff; color:white; padding:3px 8px; border-radius:4px; font-size:11px; margin-left:5px; font-weight:900; box-shadow: 0 0 12px #ff00ff; animation: pulseRed 1s infinite;}
     </style>
 </head>
 <body>
 
+    <!-- AUTH SCREEN -->
     <div class="container" id="authScreen">
-        <h1 class="western-title">🤠 Saloon Golpeado 🃏</h1>
-        <p style="color:#f1c40f; font-size:14px;">Identifícate para entrar al Saloon</p>
+        <h1 class="western-title">⚡ Ciber-Saloon ⚡</h1>
+        <p style="color:var(--cyan-neon); font-size:14px;">Inyecta tu firma digital para entrar</p>
         
         <input type="text" id="authUsername" placeholder="Nickname">
         <div class="pwd-container">
@@ -122,86 +201,86 @@
         </div>
         
         <div style="display:flex; gap:10px; margin-top:10px;">
-            <button onclick="login()" style="flex:1;">Entrar</button>
-            <button onclick="register()" style="flex:1; background: linear-gradient(#27ae60, #2ecc71);">Crear Cuenta</button>
+            <button onclick="login()" style="flex:1;">Conectar</button>
+            <button onclick="register()" style="flex:1; border-color: var(--magenta-neon); color: var(--magenta-neon);">Sincronizar Nodo</button>
         </div>
         
-        <div style="margin-top: 15px; border-top: 1px solid #5c3a21; padding-top: 15px;">
-            <button onclick="loginAsGuest()" style="width:100%; background: linear-gradient(#7f8c8d, #34495e); color: white; margin-bottom: 8px;">🕵️‍♂️ Jugar como Invitado</button>
-            <button onclick="alert('Próximamente: Entrar con Google')" style="width:100%; background: white; color: #444; border: 1px solid #ccc; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; gap: 10px;">
-                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Entrar con Google
-            </button>
+        <div style="margin-top: 15px; border-top: 1px solid var(--border-glass); padding-top: 15px;">
+            <button onclick="loginAsGuest()" style="width:100%; border-color:#7f8c8d; color:#7f8c8d;">🕵️‍♂️ Entrar como Clon Temp (Invitado)</button>
         </div>
-        <p id="authError" style="color:#e74c3c; font-size:12px; height:15px; margin-top:10px; font-weight: bold;"></p>
+        <p id="authError" style="color:var(--magenta-neon); font-size:12px; height:15px; margin-top:10px; font-weight: bold;"></p>
     </div>
 
+    <!-- LOBBY -->
     <div class="container hidden" id="lobby">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #5c3a21; padding-bottom:10px; margin-bottom:15px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid var(--border-glass); padding-bottom:10px; margin-bottom:15px;">
             <div style="text-align:left;">
-                <h3 style="margin:0; color:#f1c40f;" id="profileName">Jugador</h3>
+                <h3 style="margin:0;" id="profileName">Jugador</h3>
                 <span style="font-size:12px; color:#ecf0f1;">🏆 Victorias: <strong id="profileWins">0</strong> | 💰 Fichas: <strong id="profilePoints">0</strong></span>
                 <br>
-                <button onclick="logoutAndGoBack()" style="background: #7f8c8d; width: auto; padding: 4px 10px; font-size: 11px; margin-top: 5px;">⬅️ Salir de la Cuenta</button>
+                <button onclick="logoutAndGoBack()" style="border-color: #e74c3c; color: #e74c3c; width: auto; padding: 4px 10px; font-size: 11px; margin-top: 5px;">⬅️ Desconectar Nodo</button>
             </div>
             <div style="display: flex; gap: 5px;">
-                <button style="width:auto; padding:5px 10px; font-size:12px; background:linear-gradient(#f39c12, #d35400);" onclick="openRanking()">🏆 Top 10</button>
-                <button style="width:auto; padding:5px 10px; font-size:12px; background:linear-gradient(#8e44ad, #5e3370);" onclick="openStore()">🛒 Tienda</button>
+                <button style="width:auto; padding:5px 10px; font-size:12px;" onclick="openRanking()">🏆 Ranking</button>
+                <button style="width:auto; padding:5px 10px; font-size:12px; border-color:var(--magenta-neon); color:var(--magenta-neon);" onclick="openStore()">🛒 Tienda</button>
             </div>
         </div>
 
-        <button onclick="createRoom()">Crear Mesa Privada</button>
+        <button onclick="createRoom()">Crear Terminal Privada</button>
         <div style="display:flex; gap:5px; margin: 10px 0;">
-            <input type="text" id="roomCode" placeholder="Código de Sala" style="margin:0;">
-            <button onclick="joinRoom()" style="width:auto; margin:0;">Unirse</button>
+            <input type="text" id="roomCode" placeholder="Frecuencia de Sala" style="margin:0;">
+            <button onclick="joinRoom()" style="width:auto; margin:0;">Enlazar</button>
         </div>
 
         <div class="room-list-container">
-            <h4 style="margin: 0 0 10px 0; color: #f1c40f;">🚪 Mesas Abiertas en el Saloon:</h4>
-            <div id="publicRoomsList" style="font-size: 12px; color: #ecf0f1;">Cargando mesas...</div>
+            <h4 style="margin: 0 0 10px 0; color: var(--cyan-neon);">🚪 Redes Disponibles:</h4>
+            <div id="publicRoomsList" style="font-size: 12px; color: #ecf0f1;">Escaneando puertos...</div>
         </div>
     </div>
 
+    <!-- WAITING ROOM (MESA DE ESPERA) -->
     <div class="container hidden" id="waitingRoom">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <button onclick="leaveRoom()" style="background: #e74c3c; width: auto; padding: 5px 15px; font-size: 12px; margin: 0;">⬅️ Volver al Lobby</button>
-            <h2 class="western-title" style="margin:0;">Sala: <span id="displayCode" style="color:#f1c40f;">----</span></h2>
+            <button onclick="leaveRoom()" style="border-color: #e74c3c; color: #e74c3c; width: auto; padding: 5px 15px; font-size: 12px; margin: 0;">⬅️ Abortar Red</button>
+            <h2 class="western-title" style="margin:0; font-size: 1.5rem;">Frecuencia: <span id="displayCode" style="color:var(--magenta-neon);">----</span></h2>
         </div>
         
         <div id="hostSettingsArea" class="hidden settings-panel">
-            <h4 class="settings-title">⚙️ Panel de Administrador</h4>
+            <h4 class="settings-title">⚙️ Kernel Operacional (Admin)</h4>
             <div class="settings-grid">
-                <div class="setting-item"> <label>👥 Máx. Jugadores</label> <select id="setPlayers" onchange="sendSettings()"><option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option></select> </div>
-                <div class="setting-item"> <label>🃏 Jokers</label> <select id="setJokers" onchange="sendSettings()"><option value="0">0 Jokers</option><option value="1">1 Joker</option><option value="2" selected>2 Jokers</option><option value="3">3 Jokers</option><option value="4">4 Jokers</option><option value="5">5 Jokers</option></select> </div>
-                <div class="setting-item"> <label>⏱️ Tiempo/Turno</label> <select id="setTurnTime" onchange="sendSettings()"><option value="15">15 seg</option><option value="30" selected>30 seg</option><option value="45">45 seg</option><option value="60">60 seg</option></select> </div>
-                <div class="setting-item"> <label>🎲 Empieza</label> <select id="setStarter" onchange="sendSettings()"></select> </div>
+                <div class="setting-item"> <label>👥 Límite Nodos</label> <select id="setPlayers" onchange="sendSettings()"><option value="2">2 Max</option><option value="3">3 Max</option><option value="4">4 Max</option><option value="5" selected>5 Max</option></select> </div>
+                <div class="setting-item"> <label>🃏 Núcleos Comodín</label> <select id="setJokers" onchange="sendSettings()"><option value="0">0 Comodines</option><option value="1">1 Joker</option><option value="2" selected>2 Jokers</option><option value="3">3 Jokers</option></select> </div>
+                <div class="setting-item"> <label>⏱️ Ciclo de Turno</label> <select id="setTurnTime" onchange="sendSettings()"><option value="15">15 seg</option><option value="30" selected>30 seg</option><option value="45">45 seg</option></select> </div>
+                <div class="setting-item"> <label>🎲 Iniciador</label> <select id="setStarter" onchange="sendSettings()"></select> </div>
             </div>
         </div>
 
         <div class="room-history-container" id="roomHistoryArea">
-            <h4 style="margin:0 0 8px 0; color:#f1c40f;">📜 Historial de Partidas</h4>
-            <div id="roomHistoryList"> <span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span> </div>
+            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">📜 Bitácora de Ciclos</h4>
+            <div id="roomHistoryList"> <span style="font-size:11px; color:#aaa;">No se registran datos previos.</span> </div>
         </div>
 
-        <h4 style="color:#ecf0f1; margin-top:15px;">🎭 Elige tu sombrero (Los que no tienes, salen bloqueados 🔒):</h4>
+        <h4 style="color:#ecf0f1; margin-top:15px;">🎭 Modula tu Holo-Sombrero (Bloqueados requieren licencia 🔒):</h4>
         <div class="char-grid" id="charactersGrid"></div>
         <div id="playerList" style="margin-top:10px;"></div>
-        <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
-        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; background: linear-gradient(#27ae60, #2ecc71);">REPARTIR CARTAS 🚀</button>
+        <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">ESTABLECER EN LÍNEA</button>
+        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; border-color: var(--magenta-neon); color: var(--magenta-neon);">COMPILAR SISTEMA 🚀</button>
     </div>
 
+    <!-- TABLERO DE JUEGO (GAME BOARD) -->
     <div class="board hidden" id="gameBoard">
         <div class="poker-table-wrapper">
             <div class="opponents-container" id="opponentsArea"></div>
-            <div class="poker-table">
+            <div class="poker-table" id="mainPokerTable">
                 <div class="mat">
-                    <div class="card-back" onclick="drawCard('deck')"> <span id="deckCount" style="font-size:10px; background:rgba(0,0,0,0.8); padding:2px 4px; border-radius:5px; position:absolute; bottom:2px;">0</span> </div>
+                    <div class="card-back" onclick="drawCard('deck')"> <span id="deckCount" style="font-size:10px; background:rgba(0,0,0,0.8); padding:2px 4px; border-radius:5px; position:absolute; bottom:2px; color:var(--cyan-neon);">0</span> </div>
                     <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
                 </div>
                 <div class="exposed-groups-container" id="exposedArea"></div>
                 
                 <div style="position:absolute; bottom: 5px; display:flex; align-items:center; justify-content:center; width:100%; gap: 8px;">
-                    <span id="turnIndicator" style="font-family:'Rye',cursive; color:#f1c40f; text-shadow:1px 1px 2px black; font-size:13px;">Cargando...</span>
-                    <span id="timerDisplay" style="background:#e74c3c; border: 1px solid white; padding:2px 6px; border-radius:5px; font-weight:bold; font-size:12px; display:none;">⏱️ 30s</span>
+                    <span id="turnIndicator" style="color:var(--cyan-neon); font-size:13px; font-weight: bold;">Cargando matriz...</span>
+                    <span id="timerDisplay" style="background:#ff00ff; border: 1px solid white; padding:2px 6px; border-radius:5px; font-weight:bold; font-size:12px; display:none;">⏱️ 30s</span>
                 </div>
             </div>
         </div>
@@ -210,74 +289,78 @@
             <div class="status-container">
                 <div id="localAvatarArea"></div> 
                 <div class="status-bar" id="gameplayButtons">
-                    <button onclick="voteKickActive()" style="background: linear-gradient(#c0392b, #900); color:white;">🚨 Expulsar</button>
-                    <button id="discardKnockBtn" onclick="actionDiscardOrKnock()" style="background: linear-gradient(#f1c40f, #d35400); color:black;">¡GOLPE!</button>
-                    <button onclick="surrenderHand()">🪦 Retirar</button>
-                    <button onclick="tauntCard()" style="background: linear-gradient(#8e44ad, #5e3370); color:white;">🃏 Burlar</button>
+                    <button onclick="voteKickActive()" style="border-color:#e74c3c; color:#e74c3c;">🚨 Purgar</button>
+                    <button id="discardKnockBtn" onclick="actionDiscardOrKnock()">¡GOLPE!</button>
+                    <button onclick="surrenderHand()">🪦 Desconectarse</button>
+                    <button onclick="tauntCard()" style="border-color:var(--magenta-neon); color:var(--magenta-neon);">🃏 Interferencia</button>
                 </div>
             </div>
-            <p id="helperText" style="font-size: 11px; color: #f1c40f; margin: 0 0 2px 0;"></p>
+            <p id="helperText" style="font-size: 11px; color: var(--cyan-neon); margin: 0 0 2px 0;"></p>
             <div class="hand-container" id="myHand"></div>
         </div>
-        <div id="spectatorBanner" class="spectator-banner hidden">👀 Estás de Espectador. Espera a que termine la ronda.</div>
+        <div id="spectatorBanner" class="spectator-banner hidden">👀 Enlace Pasivo (Espectador). Sincronizando flujo de datos...</div>
     </div>
 
-    <div class="container hidden" id="jokerModal" style="position:fixed; top:20vh; left:50%; transform:translateX(-50%); z-index:2000; width:80%; max-width:400px; background: rgba(10, 5, 0, 0.95); border: 2px solid #8e44ad; box-shadow: 0 0 30px #8e44ad;">
-        <h3 style="color:#e0aaff;">🤔 ¿Qué valor tomará el Joker?</h3>
-        <p style="font-size:12px; color:#ecf0f1; margin-bottom:15px;">Selecciona la carta que el Joker va a imitar para poder bajar el grupo:</p>
-        <div id="jokerOptions" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-            </div>
-        <button onclick="document.getElementById('jokerModal').classList.add('hidden'); selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));" style="background:#c0392b; margin-top:15px; width: 100%;">❌ Cancelar Selección</button>
+    <!-- MODAL PARA ELEGIR EL VALOR DEL JOKER (FLEXIBLE) -->
+    <div class="container hidden" id="jokerModal" style="position:fixed; top:20vh; left:50%; transform:translateX(-50%); z-index:2000; width:80%; max-width:400px; background: rgba(10, 5, 20, 0.95); border: 2px solid var(--magenta-neon); box-shadow: 0 0 30px var(--magenta-neon);">
+        <h3 style="color:var(--magenta-neon);">🤔 ¿Qué algoritmo emulará el Joker?</h3>
+        <p style="font-size:12px; color:#ecf0f1; margin-bottom:15px;">Selecciona la identidad de datos que tomará el comodín:</p>
+        <div id="jokerOptions" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px;"></div>
+        <button onclick="document.getElementById('jokerModal').classList.add('hidden'); selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));" style="border-color:#e74c3c; color:#e74c3c; margin-top:15px; width: 100%;">❌ Abortar Transacción</button>
     </div>
 
+    <!-- CHAT GLOBAL -->
     <div id="chatBox" class="minimized hidden" onclick="if(this.classList.contains('minimized')) toggleChat(event)">
-        <div class="chat-header" onclick="toggleChat(event)"> <h4>💬 Chat del Saloon</h4> <span id="chatToggleIcon">▲</span> </div>
+        <div class="chat-header" onclick="toggleChat(event)"> <h4>💬 Comms Link</h4> <span id="chatToggleIcon">▲</span> </div>
         <div id="chatNotif" class="notification-dot hidden"></div>
         <div id="chatMessages"></div>
-        <div class="chat-input-area"> <input type="text" id="chatInput" placeholder="Mensaje..."> <button onclick="sendTypedChat()">Enviar</button> </div>
+        <div class="chat-input-area"> <input type="text" id="chatInput" placeholder="Transmitir datos..."> <button onclick="sendTypedChat()">Enviar</button> </div>
         <div class="chat-emotes">
             <button class="emote-btn" onclick="sendChat('🃏')">🃏</button> <button class="emote-btn" onclick="sendChat('😂')">😂</button> <button class="emote-btn" onclick="sendChat('😡')">😡</button> <button class="emote-btn" onclick="sendChat('🤠')">🤠</button>
         </div>
     </div>
 
-    <div class="container hidden" id="victoryModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:1000; width:80%; max-width:500px;">
-        <h1 class="western-title" style="color:#e74c3c; font-size:1.8rem;">💥 FIN DE MANO 💥</h1>
+    <!-- MODAL DE VICTORIA -->
+    <div class="container hidden" id="victoryModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:1000; width:80%; max-width:500px; border-color:var(--magenta-neon);">
+        <h1 class="western-title" style="color:var(--magenta-neon); font-size:1.8rem;">💥 ANOMALÍA COMPLETA (FIN) 💥</h1>
         <p style="margin:0;"><strong id="knockerName">-</strong></p>
-        <h2 id="victoryAlert" style="color:#f1c40f; margin:10px 0;">Ganador</h2>
+        <h2 id="victoryAlert" style="color:var(--cyan-neon); margin:10px 0;">Ganador</h2>
         <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px;" id="modalScoreBody"></table>
         <div style="display:flex; gap:10px; margin-top: 15px;">
-            <button onclick="returnToIndividualLobby()" style="flex:1;">🔄 Volver a la Sala</button>
-            <button onclick="leaveRoom()" style="flex:1; background: linear-gradient(#c0392b, #900);">🚪 Salir del Juego</button>
+            <button onclick="returnToIndividualLobby()" style="flex:1;">🔄 Re-enlazar Ciclo</button>
+            <button onclick="leaveRoom()" style="flex:1; border-color: #c0392b; color: #c0392b;">🚪 Salir del Servidor</button>
         </div>
     </div>
 
-    <div class="container hidden" id="rankingModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:1000; width:85%; max-width:400px; background: rgba(10, 5, 0, 0.95);">
-        <h2 class="western-title">🏆 Salón de la Fama</h2>
-        <div id="rankingList" style="text-align: left; margin-bottom: 15px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">Cargando leyendas...</div>
-        <button onclick="document.getElementById('rankingModal').classList.add('hidden')" style="background: #7f8c8d;">Cerrar</button>
+    <!-- MODAL DE RANKING -->
+    <div class="container hidden" id="rankingModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:1000; width:85%; max-width:400px;">
+        <h2 class="western-title" style="font-size:1.6rem;">🏆 Matriz de Élite</h2>
+        <div id="rankingList" style="text-align: left; margin-bottom: 15px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">Cargando nodos maestros...</div>
+        <button onclick="document.getElementById('rankingModal').classList.add('hidden')" style="border-color: #7f8c8d; color:#7f8c8d;">Cerrar HUD</button>
     </div>
 
-    <div class="container hidden" id="storeModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:1000; width:85%; max-width:400px; background: rgba(10, 5, 0, 0.95);">
-        <h2 class="western-title">🛒 Tienda del Saloon</h2>
-        <p style="color:#f1c40f; font-size:12px;">Tus Fichas: <strong id="storeMyPoints">0</strong></p>
+    <!-- MODAL DE TIENDA -->
+    <div class="container hidden" id="storeModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:1000; width:85%; max-width:400px;">
+        <h2 class="western-title" style="font-size:1.6rem;">🛒 Mercado Negro Cyber</h2>
+        <p style="color:var(--cyan-neon); font-size:12px;">Créditos Disponibles: <strong id="storeMyPoints">0</strong></p>
         
-        <h3 style="font-size:14px; color:#ecf0f1; border-bottom:1px solid #5c3a21; padding-bottom:5px;">Personajes (Avatares)</h3>
+        <h3 style="font-size:14px; color:#ecf0f1; border-bottom:1px solid var(--border-glass); padding-bottom:5px;">Holo-Sombreros</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; max-height: 25vh; overflow-y: auto; padding-right: 5px;">
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <div style="font-size: 30px;">🐍</div> <p style="margin: 5px 0; font-size: 12px;">Serpiente</p> <button onclick="buyItem('char', '🐍', 150)" style="padding: 5px; font-size: 11px; background: #27ae60;">150 Fichas</button> </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <div style="font-size: 30px;">🐺</div> <p style="margin: 5px 0; font-size: 12px;">Lobo</p> <button onclick="buyItem('char', '🐺', 200)" style="padding: 5px; font-size: 11px; background: #27ae60;">200 Fichas</button> </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <div style="font-size: 30px;">🦅</div> <p style="margin: 5px 0; font-size: 12px;">Águila</p> <button onclick="buyItem('char', '🦅', 200)" style="padding: 5px; font-size: 11px; background: #27ae60;">200 Fichas</button> </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <div style="font-size: 30px;">🦈</div> <p style="margin: 5px 0; font-size: 12px;">Tiburón</p> <button onclick="buyItem('char', '🦈', 250)" style="padding: 5px; font-size: 11px; background: #27ae60;">250 Fichas</button> </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px; grid-column: span 2;"> <div style="font-size: 30px;">👽</div> <p style="margin: 5px 0; font-size: 12px;">Alien Mítico</p> <button onclick="buyItem('char', '👽', 500)" style="padding: 5px; font-size: 11px; background: #8e44ad;">500 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <div style="font-size: 30px;">🐍</div> <p style="margin: 5px 0; font-size: 12px;">Sint-Serpiente</p> <button onclick="buyItem('char', '🐍', 150)" style="padding: 5px; font-size: 11px;">150 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <div style="font-size: 30px;">🐺</div> <p style="margin: 5px 0; font-size: 12px;">Ciber-Lobo</p> <button onclick="buyItem('char', '🐺', 200)" style="padding: 5px; font-size: 11px;">200 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <div style="font-size: 30px;">🦅</div> <p style="margin: 5px 0; font-size: 12px;">Holo-Águila</p> <button onclick="buyItem('char', '🦅', 200)" style="padding: 5px; font-size: 11px;">200 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <div style="font-size: 30px;">🦈</div> <p style="margin: 5px 0; font-size: 12px;">Mecha-Tiburón</p> <button onclick="buyItem('char', '🦈', 250)" style="padding: 5px; font-size: 11px;">250 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px; grid-column: span 2;"> <div style="font-size: 30px;">👽</div> <p style="margin: 5px 0; font-size: 12px;">Forastero Encriptado</p> <button onclick="buyItem('char', '👽', 500)" style="padding: 5px; font-size: 11px; border-color:var(--magenta-neon); color:var(--magenta-neon);">500 Fichas</button> </div>
         </div>
 
-        <h3 style="font-size:14px; color:#ecf0f1; border-bottom:1px solid #5c3a21; padding-bottom:5px;">Efectos Especiales (Nombres)</h3>
+        <h3 style="font-size:14px; color:#ecf0f1; border-bottom:1px solid var(--border-glass); padding-bottom:5px;">Frecuencias de Resplandor</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <p class="glow-gold" style="font-size: 14px; margin: 5px 0;">Leyenda</p> <p style="font-size: 10px; margin: 0 0 5px 0; color:#aaa;">Resplandor Oro</p> <button onclick="buyItem('effect', 'glow-gold', 500)" style="padding: 5px; font-size: 11px; background: #8e44ad;">500 Fichas</button> </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid #aa7f18; border-radius: 8px;"> <p class="glow-neon" style="font-size: 14px; margin: 5px 0;">Ciberpunk</p> <p style="font-size: 10px; margin: 0 0 5px 0; color:#aaa;">Resplandor Neón</p> <button onclick="buyItem('effect', 'glow-neon', 500)" style="padding: 5px; font-size: 11px; background: #8e44ad;">500 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <p class="glow-gold" style="font-size: 14px; margin: 5px 0;">Modo Oro</p> <button onclick="buyItem('effect', 'glow-gold', 500)" style="padding: 5px; font-size: 11px;">500 Fichas</button> </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 10px; border: 1px solid var(--border-glass); border-radius: 8px;"> <p class="glow-neon" style="font-size: 14px; margin: 5px 0;">Modo Ciber</p> <button onclick="buyItem('effect', 'glow-neon', 500)" style="padding: 5px; font-size: 11px; border-color:var(--magenta-neon); color:var(--magenta-neon);">500 Fichas</button> </div>
         </div>
 
         <p id="storeMsg" style="font-size:12px; height: 15px; color: #ecf0f1; margin: 0 0 10px 0; font-weight: bold;"></p>
-        <button onclick="document.getElementById('storeModal').classList.add('hidden')" style="background: #7f8c8d;">Salir de la Tienda</button>
+        <button onclick="document.getElementById('storeModal').classList.add('hidden')" style="border-color: #7f8c8d; color:#7f8c8d;">Apagar Terminal</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -308,7 +391,7 @@
         function logoutAndGoBack() {
             loggedUser = null; myName = ''; currentRoomId = '';
             document.getElementById('authPassword').value = ''; document.getElementById('authError').innerText = '';
-            document.getElementById('profileName').className = ''; // Quitar efectos
+            document.getElementById('profileName').className = ''; 
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('chatBox').classList.add('hidden');
             document.getElementById('authScreen').classList.remove('hidden');
@@ -317,21 +400,21 @@
         async function register() {
             const u = document.getElementById('authUsername').value.trim(); const p = document.getElementById('authPassword').value.trim();
             const errEl = document.getElementById('authError');
-            if (!u || !p) return errEl.innerText = "Llena ambos campos para registrarte.";
-            errEl.style.color = "#f1c40f"; errEl.innerText = "Creando cuenta...";
+            if (!u || !p) return errEl.innerText = "Suministra credenciales válidas.";
+            errEl.innerText = "Inyectando datos...";
             try {
                 const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
                 const data = await res.json();
-                if(res.ok) { errEl.style.color = '#27ae60'; errEl.innerText = "¡Cuenta creada! Ahora presiona 'Entrar'."; } 
-                else { errEl.style.color = '#e74c3c'; errEl.innerText = data.error || "Error al crear cuenta."; }
-            } catch (error) { errEl.style.color = '#e74c3c'; errEl.innerText = "Error de red. Revisa tu conexión."; }
+                if(res.ok) { errEl.style.color = '#00f2ff'; errEl.innerText = "¡Estructura registrada! Enlaza tu conexión."; } 
+                else { errEl.style.color = '#ff00ff'; errEl.innerText = data.error || "Error de compilación."; }
+            } catch (error) { errEl.style.color = '#ff00ff'; errEl.innerText = "Fallo de enlace de red."; }
         }
 
         async function login() {
             const u = document.getElementById('authUsername').value.trim(); const p = document.getElementById('authPassword').value.trim();
             const errEl = document.getElementById('authError');
-            if (!u || !p) return errEl.innerText = "Llena ambos campos para entrar.";
-            errEl.style.color = "#f1c40f"; errEl.innerText = "Iniciando sesión...";
+            if (!u || !p) return errEl.innerText = "Suministra credenciales válidas.";
+            errEl.innerText = "Sincronizando núcleo...";
             try {
                 const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
                 const data = await res.json();
@@ -339,7 +422,7 @@
                     loggedUser = data.user; myName = loggedUser.username;
                     const nameEl = document.getElementById('profileName');
                     nameEl.innerText = loggedUser.username;
-                    nameEl.className = loggedUser.activeEffect || ''; // Aplicar efecto visual si tiene
+                    nameEl.className = loggedUser.activeEffect || ''; 
                     
                     document.getElementById('profileWins').innerText = loggedUser.victories;
                     document.getElementById('profilePoints').innerText = loggedUser.points;
@@ -347,19 +430,18 @@
                     document.getElementById('authScreen').classList.add('hidden');
                     document.getElementById('lobby').classList.remove('hidden');
                     document.getElementById('chatBox').classList.remove('hidden'); 
-                } else { errEl.style.color = '#e74c3c'; errEl.innerText = data.error || "Datos incorrectos."; }
-            } catch (error) { errEl.style.color = '#e74c3c'; errEl.innerText = "Error de red."; }
+                } else { errEl.style.color = '#ff00ff'; errEl.innerText = data.error || "Clave rechazada."; }
+            } catch (error) { errEl.style.color = '#ff00ff'; errEl.innerText = "Error en el túnel de red."; }
         }
 
         function loginAsGuest() {
             let u = document.getElementById('authUsername').value.trim();
-            if (!u) u = "Invitado_" + Math.floor(1000 + Math.random() * 9000); 
-            // Invitados: 5 gratis
+            if (!u) u = "Clon_" + Math.floor(1000 + Math.random() * 9000); 
             loggedUser = { username: u, victories: 0, points: 0, isGuest: true, unlockedChars: ['🤠', '🤖', '💀', '🦊', '🦁'], activeEffect: '' };
             myName = u;
             
             const nameEl = document.getElementById('profileName');
-            nameEl.innerText = u + " (Invitado)"; nameEl.className = '';
+            nameEl.innerText = u + " (Temporal)"; nameEl.className = '';
             
             document.getElementById('profileWins').innerText = "-"; document.getElementById('profilePoints').innerText = "-";
             document.getElementById('authScreen').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); document.getElementById('chatBox').classList.remove('hidden'); 
@@ -367,18 +449,18 @@
 
         async function openRanking() {
             document.getElementById('rankingModal').classList.remove('hidden');
-            const list = document.getElementById('rankingList'); list.innerHTML = 'Buscando leyendas...';
+            const list = document.getElementById('rankingList'); list.innerHTML = 'Indexando nodos...';
             try {
                 const res = await fetch('/api/ranking'); const data = await res.json();
                 list.innerHTML = data.map((u, i) => `
-                    <div style="padding: 8px 0; border-bottom: 1px solid #5c3a21; display:flex; justify-content:space-between;">
-                        <span><strong style="color:#f1c40f;">#${i+1}</strong> ${u.username}</span> <span>${u.victories} 🏆</span>
+                    <div style="padding: 8px 0; border-bottom: 1px solid var(--border-glass); display:flex; justify-content:space-between;">
+                        <span><strong style="color:var(--cyan-neon);">#${i+1}</strong> ${u.username}</span> <span>${u.victories} Ciclos</span>
                     </div>`).join('');
-            } catch (e) { list.innerHTML = 'Error de conexión con el ranking.'; }
+            } catch (e) { list.innerHTML = 'Fallo al interrogar al Ranking.'; }
         }
 
         function openStore() {
-            if(!loggedUser || loggedUser.isGuest) return alert('Los invitados no pueden usar la tienda. ¡Crea una cuenta real!');
+            if(!loggedUser || loggedUser.isGuest) return alert('Clones temporales no tienen acceso al mercado.');
             document.getElementById('storeModal').classList.remove('hidden');
             document.getElementById('storeMyPoints').innerText = loggedUser.points;
             document.getElementById('storeMsg').innerText = '';
@@ -386,7 +468,7 @@
 
         async function buyItem(type, item, price) {
             const msgEl = document.getElementById('storeMsg');
-            msgEl.style.color = '#f1c40f'; msgEl.innerText = 'Procesando pago...';
+            msgEl.style.color = 'var(--cyan-neon)'; msgEl.innerText = 'Transfiriendo créditos...';
             try {
                 const res = await fetch('/api/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: loggedUser.username, item, price, type }) });
                 const data = await res.json();
@@ -399,24 +481,24 @@
                     }
                     document.getElementById('profilePoints').innerText = loggedUser.points;
                     document.getElementById('storeMyPoints').innerText = loggedUser.points;
-                    msgEl.style.color = '#27ae60'; msgEl.innerText = data.message;
-                } else { msgEl.style.color = '#e74c3c'; msgEl.innerText = data.error; }
-            } catch (e) { msgEl.style.color = '#e74c3c'; msgEl.innerText = 'Error de conexión.'; }
+                    msgEl.style.color = '#00f2ff'; msgEl.innerText = data.message;
+                } else { msgEl.style.color = 'var(--magenta-neon)'; msgEl.innerText = data.error; }
+            } catch (e) { msgEl.style.color = 'var(--magenta-neon)'; msgEl.innerText = 'Fallo en la pasarela de pago.'; }
         }
 
         socket.on('update_public_rooms', (rooms) => {
             const list = document.getElementById('publicRoomsList');
-            if (rooms.length === 0) { list.innerHTML = 'No hay mesas creadas. ¡Crea la primera!'; return; }
+            if (rooms.length === 0) { list.innerHTML = 'No se interceptan redes abiertas.'; return; }
             list.innerHTML = '';
             rooms.forEach(r => {
-                const btnTxt = r.state === 'playing' ? '👀 Espectar' : 'Entrar'; const btnCol = r.state === 'playing' ? '#d35400' : '#27ae60';
-                list.innerHTML += `<div class="room-item"><div><strong>Sala: ${r.id}</strong> (Host: ${r.host})<br>👥 ${r.players}/${r.max} | Estado: ${r.state === 'waiting' ? '🟢 Espera' : '🔴 Jugando'}</div><button style="background:${btnCol}; color:white;" onclick="joinSpecificRoom('${r.id}')">${btnTxt}</button></div>`;
+                const btnTxt = r.state === 'playing' ? '👀 Espectar' : 'Enlazar'; const btnCol = r.state === 'playing' ? 'var(--magenta-neon)' : 'var(--cyan-neon)';
+                list.innerHTML += `<div class="room-item"><div><strong>Canal: ${r.id}</strong> (Host: ${r.host})<br>👥 ${r.players}/${r.max} | Estado: ${r.state === 'waiting' ? '🟢 Abierta' : '🔴 Ejecutando'}</div><button style="border-color:${btnCol}; color:${btnCol};" onclick="joinSpecificRoom('${r.id}')">${btnTxt}</button></div>`;
             });
         });
 
-        function createRoom() { if (!loggedUser) return alert('Identifícate primero.'); socket.emit('create_room', { name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
+        function createRoom() { if (!loggedUser) return alert('Error de credencial.'); socket.emit('create_room', { name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
         function joinRoom() { const c = document.getElementById('roomCode').value.trim(); if (loggedUser && c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); } }
-        function joinSpecificRoom(id) { if (!loggedUser) return alert('Identifícate primero.'); currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
+        function joinSpecificRoom(id) { if (!loggedUser) return alert('Error de credencial.'); currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
         
         function sendSettings() {
             if(!soyHost) return;
@@ -428,11 +510,21 @@
         function startGame() { socket.emit('start_game', currentRoomId); }
         
         function actionDiscardOrKnock() {
-            if (selectedCards.length === 1 && miTurno && currentPhase === 'discard') { socket.emit('discard', { roomId: currentRoomId, cardId: selectedCards[0] }); selectedCards = []; } 
+            if (selectedCards.length === 1 && miTurno && currentPhase === 'discard') { 
+                // ANIMACIÓN DE FLIGHT ANTES DE MANDAR AL SOCKET
+                const cardEl = document.getElementById(selectedCards[0]);
+                if(cardEl) {
+                    cardEl.classList.add('card-flying');
+                    setTimeout(() => {
+                        socket.emit('discard', { roomId: currentRoomId, cardId: selectedCards[0] }); 
+                        selectedCards = [];
+                    }, 200);
+                }
+            } 
             else { socket.emit('knock', currentRoomId); }
         }
         
-        function surrenderHand() { if (confirm("🪦 ¿Retirarse de esta ronda? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
+        function surrenderHand() { if (confirm("☠️ ¿Desconectarte del ciclo y abortar tus cartas? (+20 pts).")) socket.emit('surrender_hand', currentRoomId); }
         function voteKickActive() { socket.emit('vote_kick_player', currentRoomId); }
         function returnToIndividualLobby() { socket.emit('return_individual_lobby', currentRoomId); }
         function leaveRoom() { socket.emit('leave_room', currentRoomId); }
@@ -463,7 +555,7 @@
 
         function tauntCard() {
             if (selectedCards.length === 1) { socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); document.getElementById('myHand').querySelector('.selected').classList.remove('selected'); selectedCards = []; } 
-            else { alert("⚠️ Selecciona 1 carta de tu mano para burlarte."); }
+            else { alert("⚠️ Selecciona 1 paquete de datos en mano para generar interferencia."); }
         }
 
         socket.on('show_taunt', ({ playerId, card }) => {
@@ -478,7 +570,7 @@
             setTimeout(() => popup.remove(), 3000);
         });
 
-        // --- SISTEMA DE JOKER FLEXIBLE AL ROBAR ---
+        // --- GESTIÓN DE COMODINES FLEXIBLES ---
         function showJokerModal() {
             const modal = document.getElementById('jokerModal');
             const options = document.getElementById('jokerOptions');
@@ -499,17 +591,16 @@
             if (!miTurno || currentPhase !== 'draw' || soyEspectador) return;
             if (source === 'discard') {
                 const topCardText = document.getElementById('discardSlot').innerText;
-                if (topCardText.includes('Vacío')) return alert("⚠️ Pozo vacío.");
-                if (selectedCards.length < 2) return alert("⚠️ Selecciona mínimo 2 cartas asociadas de tu mano.");
+                if (topCardText.includes('Vacío')) return alert("⚠️ Pozo desprovisto de datos.");
+                if (selectedCards.length < 2) return alert("⚠️ Selecciona mínimo 2 nodos en mano para fusionar.");
                 
-                // Detectar si el usuario seleccionó un Joker de su mano
                 const hasJoker = selectedCards.some(id => {
                     const card = myHandData.find(c => c.id === id);
                     return card && card.rank === 'Joker';
                 });
 
                 if (hasJoker) {
-                    showJokerModal(); // Llama al modal de selección de valor
+                    showJokerModal(); 
                 } else {
                     socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards });
                     selectedCards = [];
@@ -522,13 +613,13 @@
             if (idx > -1) selectedCards.splice(idx, 1); else selectedCards.push(cardId);
             document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
             const btn = document.getElementById('discardKnockBtn');
-            if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) { btn.innerText = "DESCARTAR"; btn.style.background = "linear-gradient(#e67e22, #d35400)"; } 
-            else { btn.innerText = "¡GOLPE!"; btn.style.background = "linear-gradient(#f1c40f, #d35400)"; }
+            if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) { btn.innerText = "DESCARTAR"; btn.style.borderInterference = "var(--magenta-neon)"; } 
+            else { btn.innerText = "¡GOLPE!"; }
         }
 
         function handleGroupClick(groupId) {
             if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 1) { socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] }); selectedCards = []; document.getElementById('discardKnockBtn').innerText = "¡GOLPE!"; }
+            if (selectedCards.length === 1) { socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] }); selectedCards = []; }
         }
 
         function handleUnplug(groupId, cardId, event) {
@@ -571,7 +662,6 @@
             const myData = room.players.find(p => p.id === socket.id);
             miPersonaje = myData ? myData.character : null;
 
-            // SISTEMA DE INVENTARIO PARA LOS SOMBREROS
             const myUnlocked = loggedUser ? loggedUser.unlockedChars : ['🤠', '🤖', '💀', '🦊', '🦁'];
 
             allCharacters.forEach(char => {
@@ -580,7 +670,7 @@
                 const isUnlocked = myUnlocked.includes(char);
                 
                 if (!isUnlocked) {
-                    grid.innerHTML += `<button class="char-btn" style="opacity: 0.4; cursor: not-allowed;" title="Cómpralo en la tienda" disabled>🔒</button>`;
+                    grid.innerHTML += `<button class="char-btn" style="opacity: 0.3; cursor: not-allowed;" disabled>🔒</button>`;
                 } else {
                     grid.innerHTML += `<button class="char-btn ${isMySel ? 'my-selection' : ''}" onclick="pickCharacter('${char}')" ${isTaken ? 'disabled' : ''}>${char}</button>`;
                 }
@@ -589,27 +679,27 @@
             const list = document.getElementById('playerList'); list.innerHTML = ''; let readyCount = 0;
             room.players.forEach(p => {
                 if (p.ready && p.inLobby) readyCount++; const isStarter = p.id === room.startingPlayerId;
-                let statusBadge = p.inLobby ? `<span class="badge-status-lobby">🟢 En Lobby</span>` : `<span class="badge-status-waiting">🟠 Viendo Resultados</span>`;
-                list.innerHTML += `<div class="player-list-item"><span class="${p.activeEffect || ''}">${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} ${isStarter ? '👑' : ''}</span><div>${p.ready ? '✅ LISTO' : '⏳ PENSANDO'} ${statusBadge}</div></div>`;
+                let statusBadge = p.inLobby ? `<span class="badge-status-lobby">🟢 Sincro</span>` : `<span class="badge-status-waiting">🟠 Desincro</span>`;
+                list.innerHTML += `<div class="player-list-item"><span class="${p.activeEffect || ''}">${p.character || '❓'} <strong>${p.name}</strong> ${p.id === socket.id ? '(Tú)' : ''} ${isStarter ? '👑' : ''}</span><div>${p.ready ? '✅ ONLINE' : '⏳ COMPILANDO'} ${statusBadge}</div></div>`;
             });
 
             const rBtn = document.getElementById('readyBtn');
-            if(myData && myData.ready) { rBtn.innerText = "¡ESTÁS LISTO! 🟢"; rBtn.style.background = "linear-gradient(#27ae60, #2ecc71)"; }
-            else { rBtn.innerText = "MARCAR LISTO"; rBtn.style.background = "linear-gradient(to bottom, #d4af37, #aa7f18)"; }
+            if(myData && myData.ready) { rBtn.innerText = "SINCRO COMPLETA 🟢"; rBtn.style.boxShadow = "0 0 15px var(--cyan-neon)"; }
+            else { rBtn.innerText = "ESTABLECER EN LÍNEA"; rBtn.style.boxShadow = "none"; }
 
             const histList = document.getElementById('roomHistoryList');
             if (room.history && room.history.length > 0) {
                 histList.innerHTML = room.history.map((h, i) => {
-                    let handHtml = h.hand.map(c => `<span style="color:${(c.suit==='hearts'||c.suit==='diamonds')?'#e74c3c':'#fff'}; font-size:10px; background:rgba(0,0,0,0.5); padding:1px 3px; border-radius:3px;">${c.rank}${suitIcons[c.suit]||'🃏'}</span>`).join(' ');
-                    return `<div style="background:rgba(0,0,0,0.4); padding:6px; border-radius:5px; margin-bottom:5px; font-size:12px;"><strong>#${i+1}</strong> - 🏆 <strong class="${h.activeEffect||''}">${h.winner}</strong> (${h.score} pts) ${h.wasVolteado ? '<span style="color:#e74c3c; font-size:10px; font-weight:bold;">[Volteó💥]</span>' : ''}<br><div style="margin-top:3px;">Mano: ${handHtml}</div></div>`;
+                    let handHtml = h.hand.map(c => `<span style="color:${(c.suit==='hearts'||c.suit==='diamonds')?'#ff0055':'#fff'}; font-size:10px; background:rgba(0,0,0,0.5); padding:1px 3px; border-radius:3px;">${c.rank}${suitIcons[c.suit]||'🃏'}</span>`).join(' ');
+                    return `<div style="background:rgba(0,0,0,0.4); padding:6px; border-radius:5px; margin-bottom:5px; font-size:12px;"><strong>#${i+1}</strong> - 🏆 <strong class="${h.activeEffect||''}">${h.winner}</strong> (${h.score} pts) ${h.wasVolteado ? '<span style="color:var(--magenta-neon); font-size:10px; font-weight:bold;">[Volteada Corrupta💥]</span>' : ''}<br><div style="margin-top:3px;">Hand: ${handHtml}</div></div>`;
                 }).join('');
-            } else { histList.innerHTML = '<span style="font-size:11px; color:#aaa;">Aún no se han jugado manos.</span>'; }
+            } else { histList.innerHTML = '<span style="font-size:11px; color:#aaa;">No se registran datos previos.</span>'; }
 
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
         });
 
         socket.on('update_hand', (hand) => {
-            myHandData = hand; // Actualizamos los datos para la verificación del Joker
+            myHandData = hand; 
             if (soyEspectador) return; document.getElementById('lobby').classList.add('hidden'); document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('gameBoard').classList.remove('hidden');
             const container = document.getElementById('myHand'); container.innerHTML = '';
             hand.forEach(c => {
@@ -639,7 +729,7 @@
                 oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon">${p.surrendered ? '🪦' : (p.character || '❓')}</div><div class="avatar-name ${p.activeEffect||''}">${p.name}</div><div class="avatar-cards">🂠 x${p.cardCount}</div></div>`;
             });
 
-            if (!soyEspectador && myData) { const localAvatarArea = document.getElementById('localAvatarArea'); localAvatarArea.innerHTML = `<div class="avatar-icon">${myData.surrendered ? '🪦' : (myData.character || '❓')}</div><div class="avatar-name ${myData.activeEffect||''}">Tú</div>`; localAvatarArea.style.borderColor = (room.turnId === socket.id) ? '#2ecc71' : '#f1c40f'; }
+            if (!soyEspectador && myData) { const localAvatarArea = document.getElementById('localAvatarArea'); localAvatarArea.innerHTML = `<div class="avatar-icon">${myData.surrendered ? '🪦' : (myData.character || '❓')}</div><div class="avatar-name ${myData.activeEffect||''}">Tú</div>`; localAvatarArea.style.borderColor = (room.turnId === socket.id) ? 'var(--magenta-neon)' : 'var(--cyan-neon)'; }
 
             const slot = document.getElementById('discardSlot');
             if(room.topDiscard) { const c = room.topDiscard; const sClass = c.rank==='Joker'?'joker':c.suit; slot.innerHTML = `<div class="card ${sClass}" style="pointer-events:none;"><div>${c.rank}</div><div style="font-size:25px;text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div></div></div>`; } 
@@ -647,32 +737,41 @@
 
             const area = document.getElementById('exposedArea'); area.innerHTML = '';
             room.exposedGroups.forEach(g => {
-                let cardsHTML = ''; g.cards.forEach(c => { cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)" style="background:white; color:${(c.suit==='hearts'||c.suit==='diamonds')?'#c0392b':'black'}; padding:2px 5px; border-radius:3px; font-weight:bold; font-size:12px; margin:0 2px; cursor:pointer;">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`; });
-                area.innerHTML += `<div class="exposed-group" onclick="handleGroupClick('${g.id}')"><div><small style="color:#f1c40f;">${g.ownerName}:</small> </div>${cardsHTML}</div>`;
+                let cardsHTML = ''; g.cards.forEach(c => { cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)" style="background:white; color:${(c.suit==='hearts'||c.suit==='diamonds')?'#ff0055':'black'}; padding:2px 5px; border-radius:3px; font-weight:bold; font-size:12px; margin:0 2px; cursor:pointer;">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`; });
+                area.innerHTML += `<div class="exposed-group" onclick="handleGroupClick('${g.id}')"><div><small style="color:var(--cyan-neon);">${g.ownerName}:</small> </div>${cardsHTML}</div>`;
             });
 
             if (!soyEspectador) {
                 if (room.turnId === socket.id) {
                     miTurno = true;
-                    if (currentPhase === 'draw') { document.getElementById('turnIndicator').innerText = "🔴 TU TURNO: Roba carta"; document.getElementById('helperText').innerText = "Toca Mazo o selecciona combinaciones y toca Descarte."; } 
-                    else if (currentPhase === 'discard') { document.getElementById('turnIndicator').innerText = "🔵 TU TURNO: Acomoda o Descarta"; document.getElementById('helperText').innerText = "Un toque para Enchufar, Desenchufar. Toca tu carta y luego Descarta."; }
-                } else { miTurno = false; const active = room.players.find(p => p.id === room.turnId); document.getElementById('turnIndicator').innerText = `Turno de: ${active ? active.name : '...'}`; document.getElementById('helperText').innerText = "Espera tu turno..."; }
-            } else { const active = room.players.find(p => p.id === room.turnId); document.getElementById('turnIndicator').innerText = `Turno de: ${active ? active.name : '...'}`; }
+                    if (currentPhase === 'draw') { document.getElementById('turnIndicator').innerText = "⚡ TU TURNO: Absorber nodo"; document.getElementById('helperText').innerText = "Accede al Mazo o selecciona grupo reactivo de tu mano y extrae del Pozo."; } 
+                    else if (currentPhase === 'discard') { document.getElementById('turnIndicator').innerText = "⚡ TU TURNO: Depurar e Inyectar"; document.getElementById('helperText').innerText = "Toque para Enchufar / Desenchufar en grupos. Selecciona 1 carta y haz Clic en Descartar."; }
+                } else { miTurno = false; const active = room.players.find(p => p.id === room.turnId); document.getElementById('turnIndicator').innerText = `Procesando: ${active ? active.name : '...'}`; document.getElementById('helperText').innerText = "Sincronizando flujos externos..."; }
+            } else { const active = room.players.find(p => p.id === room.turnId); document.getElementById('turnIndicator').innerText = `Procesando: ${active ? active.name : '...'}`; }
         });
 
         socket.on('game_over', ({ scores, knocker, winner, wasVolteado }) => {
-            clearInterval(clockInterval); document.getElementById('knockerName').innerText = knocker === 'Mesa Cerrada' ? 'Ronda finalizada (Mesa cerrada)' : `Cierre por: ${knocker}`;
+            clearInterval(clockInterval); 
+            
+            // EFECTO VISUAL DE SACUDIDA AL GOLPEAR LA MESA
+            const tableEl = document.getElementById('mainPokerTable');
+            if(tableEl) {
+                tableEl.classList.add('shake-board');
+                setTimeout(() => tableEl.classList.remove('shake-board'), 400);
+            }
+
+            document.getElementById('knockerName').innerText = knocker === 'Mesa Cerrada' ? 'Kernel Purga Terminal' : `Ejecución de Cierre: ${knocker}`;
             const titleAlert = document.getElementById('victoryAlert');
-            if(wasVolteado) titleAlert.innerHTML = `🔥 ¡VOLTEADA COMPLETA! 🔥<br><span style="font-size:14px; color:#f1c40f;">${winner} acomodó mejor sus cartas</span>`; else titleAlert.innerText = `🏆 ¡Ganador: ${winner}! 🏆`;
+            if(wasVolteado) titleAlert.innerHTML = `🔥 CORRUPCIÓN DE ALGORITMO (VOLTEADA) 🔥<br><span style="font-size:13px; color:var(--magenta-neon); font-weight:bold;">${winner} optimizó mejor la estructura de datos</span>`; else titleAlert.innerText = `🏆 Nodo Maestro: ${winner} 🏆`;
 
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
                 const isWinner = s.name === winner; let resultBadge = '';
-                if (isWinner) { if (wasVolteado) resultBadge = '<span class="badge-volteado">VOLTEADO 💥</span>'; else resultBadge = '<span class="badge-victory">VICTORIA 🏆</span>'; }
+                if (isWinner) { if (wasVolteado) resultBadge = '<span class="badge-volteado">INTRUSO 💥</span>'; else resultBadge = '<span class="badge-victory">NODO COMPILADO 🏆</span>'; }
                 let handHTML = '<div style="margin-top: 4px;">';
-                s.finalHand.forEach(c => { let col = (c.suit === 'hearts' || c.suit === 'diamonds') ? '#c0392b' : ((c.rank === 'Joker') ? '#8e44ad' : '#ecf0f1'); handHTML += `<span style="display:inline-block; background:rgba(0,0,0,0.5); border:1px solid ${col}; color:${col}; padding:2px 4px; border-radius:4px; font-size:11px; font-weight:bold; margin-right:2px;">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`; });
+                s.finalHand.forEach(c => { let col = (c.suit === 'hearts' || c.suit === 'diamonds') ? '#ff0055' : ((c.rank === 'Joker') ? '#9c27b0' : '#1a1c2e'); handHTML += `<span style="display:inline-block; background:rgba(0,0,0,0.6); border:1px solid ${col}; color:${col}; padding:2px 4px; border-radius:4px; font-size:11px; font-weight:bold; margin-right:2px;">${c.rank}${suitIcons[c.suit] || '🃏'}</span>`; });
                 handHTML += '</div>';
-                tbody.innerHTML += `<tr style="border-bottom: 1px solid #5c3a21; background: ${isWinner ? 'rgba(241,196,15,0.2)' : 'transparent'};"><td style="text-align: left; padding: 8px;"><strong>${s.character || '❓'} ${s.name}</strong> ${resultBadge}${handHTML}</td><td style="vertical-align: middle; font-size: 16px; color:#f1c40f;"><strong>${s.score}</strong> pts</td></tr>`;
+                tbody.innerHTML += `<tr style="border-bottom: 1px solid var(--border-glass); background: ${isWinner ? 'rgba(0,242,255,0.08)' : 'transparent'};"><td style="text-align: left; padding: 8px;"><strong>${s.character || '❓'} ${s.name}</strong> ${resultBadge}${handHTML}</td><td style="vertical-align: middle; font-size: 16px; color:var(--cyan-neon);"><strong>${s.score}</strong> delta</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
         });
