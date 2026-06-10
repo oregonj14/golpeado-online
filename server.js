@@ -12,16 +12,16 @@ app.use(express.json());
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.use(express.static(__dirname));
 
-// --- 1. CONEXIÓN A LA BASE DE DATOS ---
+// --- CONEXIÓN A LA BASE DE DATOS ---
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saloon_golpeado';
 mongoose.connect(MONGO_URI)
     .then(() => console.log('📦 Base de Datos MongoDB Conectada con éxito'))
     .catch(err => {
         console.warn('⚠️ MongoDB no detectado. El juego funcionará en RAM temporal.');
-        console.error('🕵️‍♂️ CAUSA EXACTA DEL RECHAZO:', err.message);
+        console.error(err.message);
     });
 
-// --- 2. ESQUEMA DE USUARIOS ---
+// --- ESQUEMA DE USUARIOS ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -33,7 +33,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// --- 3. RUTAS API ---
+// --- RUTAS API ---
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -77,22 +77,19 @@ app.post('/api/buy', async (req, res) => {
     try {
         const { username, item, price, type } = req.body;
         const user = await User.findOne({ username });
-        
         if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
         if (user.points < price) return res.status(400).json({ error: 'Fichas insuficientes' });
-        
         if (type === 'char' && user.unlockedChars.includes(item)) return res.status(400).json({ error: 'Ya tienes este personaje' });
         if (type === 'effect' && user.unlockedEffects.includes(item)) return res.status(400).json({ error: 'Ya tienes este efecto' });
 
         user.points -= price;
         if (type === 'char') { user.unlockedChars.push(item); } else { user.unlockedEffects.push(item); user.activeEffect = item; }
-        
         await user.save();
         res.status(200).json({ message: '¡Compra exitosa!', points: user.points, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect });
     } catch (error) { res.status(500).json({ error: 'Error en la transacción' }); }
 });
 
-// --- 4. LÓGICA DEL JUEGO ---
+// --- LÓGICA DEL JUEGO ---
 const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -192,6 +189,10 @@ const getOptimalFinalScore = (hand, exposedGroups) => {
                             let rem = cards.filter((_, idx) => idx !== i && idx !== j && idx !== k);
                             minScore = Math.min(minScore, evaluate(rem, jokers, tableGroups));
                         }
+                        if (jokers >= 1 && isValidMelding([cards[i], cards[j], cards[k], {rank:'Joker'}])) {
+                            let rem = cards.filter((_, idx) => idx !== i && idx !== j && idx !== k);
+                            minScore = Math.min(minScore, evaluate(rem, jokers - 1, tableGroups));
+                        }
                     }
                 }
             }
@@ -200,9 +201,7 @@ const getOptimalFinalScore = (hand, exposedGroups) => {
             for (let g = 0; g < tableGroups.length; g++) {
                 let targetGroup = tableGroups[g];
                 if (targetGroup.cards.length < 4 && isValidMelding([...targetGroup.cards, cards[i]])) {
-                    let nextGroups = tableGroups.map((tg, idx) => {
-                        if (idx === g) return { ...tg, cards: [...tg.cards, cards[i]] }; return tg;
-                    });
+                    let nextGroups = tableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, cards[i]] }; return tg; });
                     let rem = cards.filter((_, idx) => idx !== i);
                     minScore = Math.min(minScore, evaluate(rem, jokers, nextGroups));
                 }
@@ -217,24 +216,31 @@ const hasValidGroup = (hand) => getOptimalFinalScore(hand, []) < calculatePoints
 const canPlugIn = (group, card) => isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
+    // CÁLCULO DEL PRÓXIMO TURNO PARA EL FRONTEND
+    let activePlayers = room.players.filter(p => !p.surrendered);
+    let currentActiveIdx = activePlayers.findIndex(p => p.id === room.players[room.turnIndex]?.id);
+    let nextTurnName = "...";
+    if (activePlayers.length > 1 && currentActiveIdx !== -1) {
+        let nextPlayer = activePlayers[(currentActiveIdx + 1) % activePlayers.length];
+        if (nextPlayer) nextTurnName = nextPlayer.name;
+    }
+
     return {
         id: room.id, hostId: room.players[0]?.id, 
         players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered, inLobby: p.inLobby, activeEffect: p.activeEffect })),
         spectators: room.spectators.map(s => ({ id: s.id, name: s.name })), topDiscard: room.discardPile[room.discardPile.length - 1] || null, 
         turnId: room.players[room.turnIndex]?.id, deckCount: room.deck.length, phase: room.phase, exposedGroups: room.exposedGroups, maxPlayers: room.maxPlayers, 
-        jokerCount: room.jokerCount, turnTime: room.turnTime, state: room.state, startingPlayerId: room.startingPlayerId, history: room.history, timerExpires: room.timerExpires
+        jokerCount: room.jokerCount, turnTime: room.turnTime, state: room.state, startingPlayerId: room.startingPlayerId, history: room.history, timerExpires: room.timerExpires,
+        nextTurnName: nextTurnName
     };
 };
 
-// CORRECCIÓN TURNOS: Reinicio estricto del temporizador
 const startTurnTimer = (roomId) => {
     const room = rooms[roomId];
     if (!room || room.state !== 'playing') return;
-    
     clearTimeout(room.turnTimer);
     const ms = room.turnTime * 1000;
     room.timerExpires = Date.now() + ms;
-    
     room.turnTimer = setTimeout(() => { executeAutoPlay(roomId); }, ms);
 };
 
@@ -453,13 +459,13 @@ io.on('connection', (socket) => {
             if (card) {
                 player.hand.push(card); 
                 room.phase = 'discard';
-                startTurnTimer(roomId); // CORRECCIÓN: REINICIA EL TEMPORIZADOR AL PASAR A DESCARTAR
+                startTurnTimer(roomId); // SE REINICIA EL TIEMPO AL ROBAR
                 socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
             }
         }
     });
 
-    // CORRECCIÓN: JOKER FLEXIBLE SEGURO (NÚMERO Y PALO)
+    // LÓGICA DE JOKER FLEXIBLE BLINDADA: No te quita la carta si fallas
     socket.on('pick_discard_with_meld', ({ roomId, selectedIds, jokerRank, jokerSuit }) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
@@ -467,7 +473,6 @@ io.on('connection', (socket) => {
         let topCard = room.discardPile[room.discardPile.length - 1]; if (!topCard) return;
         let cardsForMeld = player.hand.filter(c => selectedIds.includes(c.id));
         
-        // Copia de seguridad temporal
         let tempCards = cardsForMeld.map(c => ({...c}));
         tempCards.forEach(c => {
             if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
@@ -477,8 +482,6 @@ io.on('connection', (socket) => {
         if (isValidMelding(tempCards)) {
             room.discardPile.pop();
             player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
-            
-            // Si validó bien, aplicamos a la carta real
             cardsForMeld.forEach(c => {
                 if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
             });
@@ -486,10 +489,10 @@ io.on('connection', (socket) => {
 
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard';
-            startTurnTimer(roomId); // CORRECCIÓN: REINICIA EL TEMPORIZADOR AL PASAR A DESCARTAR
+            startTurnTimer(roomId); // SE REINICIA EL TIEMPO
             socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
         } else { 
-            socket.emit('error_msg', '⚠️ Combinación Inválida con el Pozo. Intenta de nuevo.'); 
+            socket.emit('error_msg', '⚠️ Combinación Inválida. El Joker sigue en tu mano.'); 
         }
     });
 
@@ -585,7 +588,6 @@ io.on('connection', (socket) => {
         const target = room.players.find(p => p.name === targetName);
         if(target) {
              io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Se ha solicitado expulsar a ${targetName}.`, character: '🚨' });
-             // Lógica de expulsión real si se desea expandir
         }
     });
 
