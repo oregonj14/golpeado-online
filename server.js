@@ -6,7 +6,16 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+
+// CONFIGURACIÓN ANTI-DESCONEXIONES PARA MÓVILES
+const io = new Server(server, {
+    pingTimeout: 120000, // Tolera hasta 2 minutos de micro-cortes
+    pingInterval: 25000, // Mantiene la conexión viva constantemente
+    connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000,
+        skipMiddlewares: true
+    }
+});
 
 app.use(express.json());
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
@@ -216,7 +225,6 @@ const hasValidGroup = (hand) => getOptimalFinalScore(hand, []) < calculatePoints
 const canPlugIn = (group, card) => isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
-    // CÁLCULO DEL PRÓXIMO TURNO PARA EL FRONTEND
     let activePlayers = room.players.filter(p => !p.surrendered);
     let currentActiveIdx = activePlayers.findIndex(p => p.id === room.players[room.turnIndex]?.id);
     let nextTurnName = "...";
