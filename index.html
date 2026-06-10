@@ -65,7 +65,15 @@
         .card.selected { border: 3px solid var(--cyan-neon); transform: translateY(-10px) !important; background-color: #fffae6 !important; box-shadow: 0 0 15px var(--cyan-neon); z-index: 50 !important; }
         .card.hearts, .card.diamonds { color: #ff0055 !important; } 
         .card.clubs, .card.spades { color: #1a1c2e !important; } 
+        /* IDENTIDAD DEL JOKER SIEMPRE VISIBLE */
         .card.joker { color: #9c27b0 !important; background: linear-gradient(135deg, #f3e5f5, #e1bee7) !important; border: 2px solid #9c27b0; }
+
+        /* ANIMACIÓN DE DESCARTE */
+        @keyframes discardAnim {
+            0% { transform: scale(1.1) translateY(-10px); opacity: 1; }
+            100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; }
+        }
+        .card-discarding { animation: discardAnim 0.3s forwards ease-in; z-index: 999 !important; pointer-events: none; }
 
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-height: 12vh; overflow-y: auto;}
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.6); padding: 3px 5px; border-radius: 6px; border: 1px solid var(--magenta-neon); cursor: pointer; }
@@ -129,8 +137,6 @@
             .status-bar button { padding: 4px 8px; font-size: 10px;}
             .avatar-icon { width: 35px; height: 35px; font-size: 18px;}
             .hand-container { min-height: 70px; gap: 3px;}
-            
-            /* CHAT TOTALMENTE ELEVADO PARA MÓVIL */
             #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatMessages { max-height: 100px; }
@@ -248,7 +254,12 @@
         </div>
     </div>
 
-    <!-- RESULTADOS FINALES CON JUEGOS EN MESA VISIBLES -->
+    <div class="container hidden" id="historyDetailsModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:10000; background:rgba(15,10,25,0.95); border:2px solid var(--cyan-neon);">
+        <h2 style="color:var(--cyan-neon); margin:0 0 15px 0;">🂡 Cartas de la Partida</h2>
+        <div id="historyDetailsContent" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
+        <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:15px; width:100%;">Cerrar Ventana</button>
+    </div>
+
     <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px;">
         <h2 style="color:var(--magenta-neon); margin:0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
         <p id="knockerName"></p><h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0;"></h3>
@@ -297,13 +308,11 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // CONFIGURACIÓN ANTI-DESCONEXIONES EN EL CLIENTE
         const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000, timeout: 20000 });
         
         let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, soyEspectador = false;
         let selectedCards = [], myHandData = [], activeRoomHistory = [];
         let miPersonaje = null; let draggedElement = null; let clockInterval = null; let loggedUser = null; 
-        
         let selectedJokerRank = null; let selectedJokerSuit = null;
 
         const allCharacters = ['🤠', '🤖', '💀', '🦊', '🦁', '🐍', '🐺', '🦅', '🦈', '👽']; 
@@ -368,7 +377,14 @@
 
         function actionDiscardOrKnock() {
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
-                socket.emit('discard', { roomId: currentRoomId, cardId: selectedCards[0] }); selectedCards = [];
+                const cardId = selectedCards[0];
+                const cardEl = document.getElementById(cardId);
+                if (cardEl) cardEl.classList.add('card-discarding'); // ANIMACIÓN DESCARTE
+                
+                setTimeout(() => {
+                    socket.emit('discard', { roomId: currentRoomId, cardId: cardId }); 
+                    selectedCards = [];
+                }, 250);
             } else { socket.emit('knock', currentRoomId); }
         }
 
@@ -440,7 +456,7 @@
             if (source === 'discard') {
                 if (document.getElementById('discardSlot').innerText.includes('Vacío')) return;
                 if (selectedCards.length < 2) return alert("Selecciona mínimo 2 cartas de tu mano.");
-                const hasJoker = selectedCards.some(id => myHandData.find(c => c.id === id && c.rank === 'Joker'));
+                const hasJoker = selectedCards.some(id => myHandData.find(c => c.id === id && c.id.includes('Joker')));
                 if (hasJoker) return showJokerModal();
                 socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards }); selectedCards = [];
             } else { socket.emit('draw_card', { roomId: currentRoomId, source: 'deck' }); }
@@ -453,6 +469,21 @@
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) btn.innerText = "DESCARTAR"; else btn.innerText = "¡GOLPE!";
         }
 
+        function openHistoryDetails(index) {
+            const match = activeRoomHistory[index]; if(!match || !match.allHands) return;
+            const modal = document.getElementById('historyDetailsModal');
+            const content = document.getElementById('historyDetailsContent'); content.innerHTML = '';
+            
+            match.allHands.forEach(p => {
+                let cardsHtml = p.hand.map(c => {
+                    let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
+                    return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.85); margin-right:-5px; pointer-events:none;"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
+                }).join('');
+                content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
+            });
+            modal.classList.remove('hidden');
+        }
+
         function tauntCard() {
             if (selectedCards.length === 1) { 
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); 
@@ -463,7 +494,8 @@
         socket.on('show_taunt', ({ playerId, card }) => {
             let avatarDiv = document.getElementById(`avatar-${playerId}`); if (!avatarDiv && playerId === socket.id && !soyEspectador) avatarDiv = document.getElementById('localAvatarArea'); if (!avatarDiv) return;
             
-            const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + (card.rank==='Joker'?'joker':card.suit);
+            let sClass = card.id.includes('Joker') ? 'joker' : card.suit;
+            const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + sClass;
             popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; 
             avatarDiv.appendChild(popup); playSound('taunt');
             
@@ -524,6 +556,7 @@
                 histList.innerHTML = activeRoomHistory.map((h, i) => `
                     <div style="background:rgba(0,0,0,0.4); padding:8px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                         <div>Ganador: <strong>${h.winner}</strong> (${h.score} pts)</div>
+                        <button onclick="openHistoryDetails(${i})" style="width:auto; padding:3px 8px; font-size:11px; margin:0;">🔍 Ver Mano de Todos</button>
                     </div>`).join('');
             }
 
@@ -534,7 +567,9 @@
             myHandData = hand; document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('gameBoard').classList.remove('hidden');
             const container = document.getElementById('myHand'); container.innerHTML = '';
             hand.forEach(c => {
-                const sClass = c.rank === 'Joker' ? 'joker' : c.suit; const cardDiv = document.createElement('div');
+                // VISIBILIDAD DEL JOKER: Si su ID incluye 'Joker', mantiene la clase CSS joker
+                const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
+                const cardDiv = document.createElement('div');
                 cardDiv.className = `card ${sClass}`; cardDiv.id = c.id; cardDiv.onclick = () => handleCardClick(c.id);
                 cardDiv.innerHTML = `<div>${c.rank}</div><div>${suitIcons[c.suit] || '🃏'}</div><div></div>`; container.appendChild(cardDiv);
                 makeCardDraggable(cardDiv);
@@ -590,11 +625,11 @@
             if(miTurno) miAvatar.classList.add('active-turn'); else miAvatar.classList.remove('active-turn');
             
             const slot = document.getElementById('discardSlot');
-            if(room.topDiscard) { const c = room.topDiscard; slot.innerHTML = `<div class="card ${c.rank==='Joker'?'joker':c.suit}" style="pointer-events:none;"><div>${c.rank}</div><div style="font-size:25px; text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div></div></div>`; } else { slot.innerHTML = `<div class="deck-slot">Vacío</div>`; }
+            if(room.topDiscard) { const c = room.topDiscard; const sClass = c.id.includes('Joker') ? 'joker' : c.suit; slot.innerHTML = `<div class="card ${sClass}" style="pointer-events:none;"><div>${c.rank}</div><div style="font-size:25px; text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div></div></div>`; } else { slot.innerHTML = `<div class="deck-slot">Vacío</div>`; }
 
             const area = document.getElementById('exposedArea'); area.innerHTML = '';
             room.exposedGroups.forEach(g => {
-                let cardsHTML = ''; g.cards.forEach(c => { cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)" class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.8); margin:0 -5px;"><div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit]}</div><div></div></span>`; });
+                let cardsHTML = ''; g.cards.forEach(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)" class="card ${sClass}" style="display:inline-flex; transform:scale(0.8); margin:0 -5px;"><div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit]}</div><div></div></span>`; });
                 area.innerHTML += `<div class="exposed-group" onclick="handleGroupClick('${g.id}')">${cardsHTML}</div>`;
             });
         });
@@ -607,17 +642,14 @@
             exposedDiv.innerHTML = '';
             if (exposedGroups && exposedGroups.length > 0) {
                 exposedGroups.forEach(g => {
-                    let cardsHtml = g.cards.map(c => `<span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.65); margin-right:-15px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`).join('');
+                    let cardsHtml = g.cards.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.65); margin-right:-15px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
                     exposedDiv.innerHTML += `<div style="display:inline-block; background:rgba(0,0,0,0.5); padding:5px; margin:5px; border-radius:5px; border:1px solid var(--magenta-neon);"><div style="font-size:10px; color:var(--cyan-neon);">${g.ownerName}</div><div style="display:flex; padding-right:15px;">${cardsHtml}</div></div>`;
                 });
             } else { exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>'; }
 
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
-                let handHtml = s.finalHand.map(c => `
-                    <span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;">
-                        <div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div>
-                    </span>`).join('');
+                let handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
                 tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
