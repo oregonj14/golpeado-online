@@ -22,12 +22,7 @@ app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.use(express.static(__dirname));
 
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saloon_golpeado';
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('📦 Base de Datos MongoDB Conectada con éxito'))
-    .catch(err => {
-        console.warn('⚠️ MongoDB no detectado. El juego funcionará en RAM temporal.');
-        console.error(err.message);
-    });
+mongoose.connect(MONGO_URI).catch(err => console.error(err));
 
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
@@ -43,67 +38,55 @@ const User = mongoose.model('User', UserSchema);
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
-        const existingUser = await User.findOne({ username });
-        if (existingUser) return res.status(400).json({ error: 'El Nickname ya está en uso' });
+        if (await User.findOne({ username })) return res.status(400).json({ error: 'Nickname en uso' });
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ username, password: hashedPassword });
         await newUser.save();
-        res.status(201).json({ message: 'Cuenta creada con éxito', user: { username: newUser.username, points: newUser.points, victories: newUser.victories, unlockedChars: newUser.unlockedChars, activeEffect: newUser.activeEffect } });
-    } catch (error) { res.status(500).json({ error: 'Error del servidor BD. Revisa los Logs.' }); }
+        res.status(201).json({ message: 'Cuenta creada' });
+    } catch (e) { res.status(500).json({ error: 'Error BD.' }); }
 });
 
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
-        if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
+        if (!user || !(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: 'Credenciales inválidas' });
+        
+        let changed = false;
+        ['🤠', '🤖', '💀', '🦊', '🦁'].forEach(c => { if (!user.unlockedChars.includes(c)) { user.unlockedChars.push(c); changed = true; } });
+        if (changed) await user.save(); 
 
-        const personajesIniciales = ['🤠', '🤖', '💀', '🦊', '🦁'];
-        let actualizoInventario = false;
-        personajesIniciales.forEach(char => {
-            if (!user.unlockedChars.includes(char)) { user.unlockedChars.push(char); actualizoInventario = true; }
-        });
-        if (actualizoInventario) await user.save(); 
-
-        res.status(200).json({ message: 'Login exitoso', user: { username: user.username, points: user.points, victories: user.victories, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect } });
-    } catch (error) { res.status(500).json({ error: 'Error del servidor BD.' }); }
+        res.status(200).json({ user });
+    } catch (e) { res.status(500).json({ error: 'Error BD.' }); }
 });
 
 app.get('/api/ranking', async (req, res) => {
     try {
-        // CORRECCIÓN: Traer a todas las personas registradas, ordenadas por victorias
         const allUsers = await User.find({}, 'username victories').sort({ victories: -1 }).limit(100);
         res.status(200).json(allUsers);
-    } catch (error) { res.status(500).json({ error: 'Error al cargar el ranking' }); }
+    } catch (e) { res.status(500).json({ error: 'Error Ranking' }); }
 });
 
 app.post('/api/buy', async (req, res) => {
     try {
         const { username, item, price, type } = req.body;
         const user = await User.findOne({ username });
-        if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-        if (user.points < price) return res.status(400).json({ error: 'Fichas insuficientes' });
-        if (type === 'char' && user.unlockedChars.includes(item)) return res.status(400).json({ error: 'Ya tienes este personaje' });
-        if (type === 'effect' && user.unlockedEffects.includes(item)) return res.status(400).json({ error: 'Ya tienes este efecto' });
+        if (!user || user.points < price) return res.status(400).json({ error: 'Fichas insuficientes' });
+        if (type === 'char' && user.unlockedChars.includes(item)) return res.status(400).json({ error: 'Ya lo tienes' });
+        if (type === 'effect' && user.unlockedEffects.includes(item)) return res.status(400).json({ error: 'Ya lo tienes' });
 
         user.points -= price;
         if (type === 'char') { user.unlockedChars.push(item); } else { user.unlockedEffects.push(item); user.activeEffect = item; }
         await user.save();
-        res.status(200).json({ message: '¡Compra exitosa!', points: user.points, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect });
-    } catch (error) { res.status(500).json({ error: 'Error en la transacción' }); }
+        res.status(200).json({ points: user.points, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect, message: 'Comprado!' });
+    } catch (e) { res.status(500).json({ error: 'Error Transacción' }); }
 });
 
-// --- LÓGICA DEL JUEGO ---
 const rooms = {};
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-const broadcastPublicRooms = () => {
-    const publicRooms = Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desconocido', players: r.players.length, max: r.maxPlayers, state: r.state }));
-    io.emit('update_public_rooms', publicRooms);
-};
+const broadcastPublicRooms = () => { io.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state }))); };
 
 const getCardValue = (rank) => {
     if (['A', '10', 'J', 'Q', 'K'].includes(rank)) return 10;
@@ -124,124 +107,105 @@ const isValidMelding = (cards) => {
     let normals = cards.filter(c => c.rank !== 'Joker');
     if (normals.length === 0) return true;
 
-    let firstRank = normals[0].rank;
-    if (normals.every(c => c.rank === firstRank)) {
+    if (normals.every(c => c.rank === normals[0].rank)) {
         let uniqueSuits = new Set(normals.map(c => c.suit)).size;
         if (uniqueSuits + jokers === cards.length && cards.length <= 4) return true;
     }
 
-    let suit = normals[0].suit;
-    if (normals.every(c => c.suit === suit)) {
+    if (normals.every(c => c.suit === normals[0].suit)) {
         let normalRanks = normals.map(c => c.rank);
-        let valuesLow = normals.map(c => {
-            if (c.rank === 'A') return 1;
-            if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13);
-            return parseInt(c.rank);
-        }).sort((a, b) => a - b);
-        let hasDuplicatesLow = new Set(valuesLow).size !== valuesLow.length;
+        let valuesLow = normals.map(c => { if (c.rank === 'A') return 1; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13); return parseInt(c.rank); }).sort((a, b) => a - b);
+        let hasDupLow = new Set(valuesLow).size !== valuesLow.length;
         let gapsLow = 0;
-        if (!hasDuplicatesLow) {
-            for (let i = 0; i < valuesLow.length - 1; i++) { gapsLow += (valuesLow[i+1] - valuesLow[i] - 1); }
-            if (gapsLow <= jokers) return true;
-        }
+        if (!hasDupLow) { for (let i = 0; i < valuesLow.length - 1; i++) { gapsLow += (valuesLow[i+1] - valuesLow[i] - 1); } if (gapsLow <= jokers) return true; }
 
-        let valuesHigh = normals.map(c => {
-            if (c.rank === 'A') return 14;
-            if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13);
-            return parseInt(c.rank);
-        }).sort((a, b) => a - b);
-        let hasDuplicatesHigh = new Set(valuesHigh).size !== valuesHigh.length;
+        let valuesHigh = normals.map(c => { if (c.rank === 'A') return 14; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13); return parseInt(c.rank); }).sort((a, b) => a - b);
+        let hasDupHigh = new Set(valuesHigh).size !== valuesHigh.length;
         let gapsHigh = 0;
-        if (!hasDuplicatesHigh) {
-            for (let i = 0; i < valuesHigh.length - 1; i++) { gapsHigh += (valuesHigh[i+1] - valuesHigh[i] - 1); }
-            if (gapsHigh <= jokers) return true;
-        }
+        if (!hasDupHigh) { for (let i = 0; i < valuesHigh.length - 1; i++) { gapsHigh += (valuesHigh[i+1] - valuesHigh[i] - 1); } if (gapsHigh <= jokers) return true; }
+        
         let isSpecialWrap = normalRanks.every(r => ['K', 'A', '2'].includes(r)) && (normalRanks.includes('K') || normalRanks.includes('2'));
         if (isSpecialWrap && (normals.length + jokers >= 3)) return true;
     }
     return false;
 };
 
-const calculatePoints = (hand) => {
-    let points = 0;
-    let jokers = hand.filter(c => c.rank === 'Joker').length;
-    let normals = hand.filter(c => c.rank !== 'Joker').sort((a, b) => b.value - a.value);
-    normals.forEach(card => { if (jokers > 0) { jokers--; } else { points += card.value; } });
-    return points;
+// --- MOTOR RECURSIVO MATEMÁTICO DE CONTEO PERFECTO ---
+const getSubsets = (array, minSize) => {
+    let subsets = [];
+    const generate = (current, start) => {
+        if (current.length >= minSize) subsets.push([...current]);
+        for (let i = start; i < array.length; i++) { current.push(array[i]); generate(current, i + 1); current.pop(); }
+    };
+    generate([], 0); return subsets;
 };
 
-const getOptimalFinalScore = (hand, exposedGroups) => {
-    let baseNormals = hand.filter(c => c.rank !== 'Joker');
-    let totalJokers = hand.filter(c => c.rank === 'Joker').length;
+const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
+    let bestScore = Infinity;
+    let bestRemainingHand = hand;
 
-    function evaluate(cards, jokers, tableGroups) {
-        let minScore = calculatePoints([...cards, ...Array(jokers).fill({rank:'Joker', value:0})]);
-        if (jokers >= 3) minScore = Math.min(minScore, evaluate(cards, jokers - 3, tableGroups));
-        if (jokers >= 4) minScore = Math.min(minScore, evaluate(cards, jokers - 4, tableGroups));
+    function evaluate(currentHand, currentTableGroups) {
+        let score = currentHand.reduce((acc, c) => acc + c.value, 0); // EL JOKER VALE 0 Y NO QUITA CARTAS
+        if (score < bestScore) { bestScore = score; bestRemainingHand = [...currentHand]; }
 
-        if (cards.length >= 1) {
-            for (let i = 0; i < cards.length; i++) {
-                if (jokers >= 2 && isValidMelding([cards[i], {rank:'Joker'}, {rank:'Joker'}])) {
-                    let rem = cards.filter((_, idx) => idx !== i);
-                    minScore = Math.min(minScore, evaluate(rem, jokers - 2, tableGroups));
-                }
-                for (let j = i + 1; j < cards.length; j++) {
-                    if (jokers >= 1 && isValidMelding([cards[i], cards[j], {rank:'Joker'}])) {
-                        let rem = cards.filter((_, idx) => idx !== i && idx !== j);
-                        minScore = Math.min(minScore, evaluate(rem, jokers - 1, tableGroups));
-                    }
-                    for (let k = j + 1; k < cards.length; k++) {
-                        if (isValidMelding([cards[i], cards[j], cards[k]])) {
-                            let rem = cards.filter((_, idx) => idx !== i && idx !== j && idx !== k);
-                            minScore = Math.min(minScore, evaluate(rem, jokers, tableGroups));
-                        }
-                    }
+        let subsets = getSubsets(currentHand, 3);
+        for (let subset of subsets) {
+            if (isValidMelding(subset)) {
+                let remaining = [...currentHand];
+                for (let card of subset) { let idx = remaining.findIndex(c => c.id === card.id); remaining.splice(idx, 1); }
+                evaluate(remaining, currentTableGroups);
+            }
+        }
+
+        for (let i = 0; i < currentHand.length; i++) {
+            let card = currentHand[i];
+            for (let g = 0; g < currentTableGroups.length; g++) {
+                let group = currentTableGroups[g];
+                if (group.cards.length < 4 && isValidMelding([...group.cards, card])) {
+                    let remainingHand = [...currentHand]; remainingHand.splice(i, 1);
+                    let nextGroups = currentTableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, card] }; return tg; });
+                    evaluate(remainingHand, nextGroups);
                 }
             }
         }
-        for (let i = 0; i < cards.length; i++) {
-            for (let g = 0; g < tableGroups.length; g++) {
-                let targetGroup = tableGroups[g];
-                if (targetGroup.cards.length < 4 && isValidMelding([...targetGroup.cards, cards[i]])) {
-                    let nextGroups = tableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, cards[i]] }; return tg; });
-                    let rem = cards.filter((_, idx) => idx !== i);
-                    minScore = Math.min(minScore, evaluate(rem, jokers, nextGroups));
-                }
-            }
-        }
-        return minScore;
     }
-    return evaluate(baseNormals, totalJokers, exposedGroups);
+    
+    evaluate(hand, exposedGroups || []);
+    
+    // Extraer las cartas que sí formaron grupo
+    let meldedCards = [...hand];
+    for (let card of bestRemainingHand) {
+        let idx = meldedCards.findIndex(c => c.id === card.id);
+        if (idx > -1) meldedCards.splice(idx, 1);
+    }
+    
+    bestRemainingHand.sort((a, b) => b.value - a.value); // Ordena las cartas sueltas para mejor visibilidad
+    
+    return { score: bestScore, orderedHand: [...meldedCards, ...bestRemainingHand] }; // Retorna juegos armados primero y cartas muertas después
 };
 
-const hasValidGroup = (hand) => getOptimalFinalScore(hand, []) < calculatePoints(hand);
+const hasValidGroup = (hand) => getOptimalFinalScoreAndHand(hand, []).score < hand.reduce((sum, c) => sum + c.value, 0);
 const canPlugIn = (group, card) => isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
     let activePlayers = room.players.filter(p => !p.surrendered);
     let currentActiveIdx = activePlayers.findIndex(p => p.id === room.players[room.turnIndex]?.id);
     let nextTurnName = "...";
-    if (activePlayers.length > 1 && currentActiveIdx !== -1) {
-        let nextPlayer = activePlayers[(currentActiveIdx + 1) % activePlayers.length];
-        if (nextPlayer) nextTurnName = nextPlayer.name;
-    }
+    if (activePlayers.length > 1 && currentActiveIdx !== -1) { let nextPlayer = activePlayers[(currentActiveIdx + 1) % activePlayers.length]; if (nextPlayer) nextTurnName = nextPlayer.name; }
 
     return {
         id: room.id, hostId: room.players[0]?.id, 
         players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered, inLobby: p.inLobby, activeEffect: p.activeEffect })),
         spectators: room.spectators.map(s => ({ id: s.id, name: s.name })), topDiscard: room.discardPile[room.discardPile.length - 1] || null, 
         turnId: room.players[room.turnIndex]?.id, deckCount: room.deck.length, phase: room.phase, exposedGroups: room.exposedGroups, maxPlayers: room.maxPlayers, 
-        jokerCount: room.jokerCount, turnTime: room.turnTime, state: room.state, startingPlayerId: room.startingPlayerId, history: room.history, timerExpires: room.timerExpires,
-        nextTurnName: nextTurnName
+        jokerCount: room.jokerCount, turnTime: room.turnTime, state: room.state, startingPlayerId: room.startingPlayerId, history: room.history, timerExpires: room.timerExpires, nextTurnName: nextTurnName
     };
 };
 
 const startTurnTimer = (roomId) => {
-    const room = rooms[roomId];
-    if (!room || room.state !== 'playing') return;
+    const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
     clearTimeout(room.turnTimer);
-    const ms = room.turnTime * 1000;
-    room.timerExpires = Date.now() + ms;
+    const ms = room.turnTime * 1000; room.timerExpires = Date.now() + ms;
     room.turnTimer = setTimeout(() => { executeAutoPlay(roomId); }, ms);
 };
 
@@ -250,10 +214,7 @@ const executeAutoPlay = (roomId) => {
     const player = room.players[room.turnIndex]; if (!player) return;
 
     if (room.phase === 'draw') {
-        if (room.deck.length === 0 && room.discardPile.length > 1) {
-            const topDiscard = room.discardPile.pop();
-            room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard];
-        }
+        if (room.deck.length === 0 && room.discardPile.length > 1) { const topDiscard = room.discardPile.pop(); room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard]; }
         let card = room.deck.pop(); if (card) player.hand.push(card);
     }
     
@@ -266,21 +227,15 @@ const executeAutoPlay = (roomId) => {
         player.hand.splice(dropIdx, 1); room.discardPile.push(dropCard);
     }
 
-    io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `⏳ Tiempo agotado. Se auto-descartó una carta de ${player.name}.`, character: '🤖' });
-    io.to(player.id).emit('update_hand', player.hand);
-    nextTurn(roomId);
+    io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `⏳ Tiempo agotado. Auto-descarte.`, character: '🤖' });
+    io.to(player.id).emit('update_hand', player.hand); nextTurn(roomId);
 };
 
 const nextTurn = (roomId) => {
     const room = rooms[roomId]; if (!room) return;
     let attempts = 0;
-    do { 
-        room.turnIndex = (room.turnIndex + 1) % room.players.length; attempts++;
-    } while (room.players[room.turnIndex].surrendered && attempts < room.players.length);
-    
-    room.phase = 'draw'; 
-    startTurnTimer(roomId);
-    io.to(roomId).emit('update_game', sanitizeRoom(room));
+    do { room.turnIndex = (room.turnIndex + 1) % room.players.length; attempts++; } while (room.players[room.turnIndex].surrendered && attempts < room.players.length);
+    room.phase = 'draw'; startTurnTimer(roomId); io.to(roomId).emit('update_game', sanitizeRoom(room));
 };
 
 const forceGameOver = async (roomId, knockerId) => {
@@ -288,8 +243,9 @@ const forceGameOver = async (roomId, knockerId) => {
     clearTimeout(room.turnTimer); room.state = 'finished'; room.players.forEach(p => p.inLobby = false); 
 
     const scores = room.players.map(p => {
-        let finalScore = p.surrendered ? getOptimalFinalScore(p.hand, room.exposedGroups) + 20 : getOptimalFinalScore(p.hand, room.exposedGroups);
-        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: p.hand, turnDiff: 0 };
+        let opt = getOptimalFinalScoreAndHand(p.hand, room.exposedGroups);
+        let finalScore = p.surrendered ? opt.score + 20 : opt.score;
+        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0 };
     });
 
     let knockerName = 'Mesa Cerrada'; let wasVolteado = false;
@@ -297,10 +253,7 @@ const forceGameOver = async (roomId, knockerId) => {
         let knockerIndex = room.players.findIndex(p => p.id === knockerId);
         if (knockerIndex > -1) {
             knockerName = room.players[knockerIndex].name;
-            scores.forEach(s => {
-                let pIndex = room.players.findIndex(p => p.id === s.id);
-                s.turnDiff = (pIndex - knockerIndex + room.players.length) % room.players.length;
-            });
+            scores.forEach(s => { let pIndex = room.players.findIndex(p => p.id === s.id); s.turnDiff = (pIndex - knockerIndex + room.players.length) % room.players.length; });
         }
     }
 
@@ -311,9 +264,8 @@ const forceGameOver = async (roomId, knockerId) => {
     const allHandsData = room.players.map(p => ({ name: p.name, character: p.character || '🤠', hand: p.hand }));
     room.history.push({ winner: winner.name, score: winner.score, hand: winner.finalHand, wasVolteado: wasVolteado, allHands: allHandsData });
 
-    try { if (mongoose.connection.readyState === 1) { await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } }); } } catch (e) { console.error(e); }
+    try { if (mongoose.connection.readyState === 1) { await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } }); } } catch (e) {}
 
-    // CORRECCIÓN: Emitir también los exposedGroups actuales a todos
     io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado, exposedGroups: room.exposedGroups });
     io.to(roomId).emit('update_lobby', sanitizeRoom(room)); 
 };
@@ -329,19 +281,10 @@ const handleLeaveRoom = (socket, roomId) => {
         if (room.players.length === 0) { clearTimeout(room.turnTimer); delete rooms[roomId]; } 
         else {
             if (room.state === 'playing') {
-                if (room.players.length < 2) {
-                    clearTimeout(room.turnTimer); room.state = 'waiting'; room.players.forEach(p => p.inLobby = true);
-                    io.to(roomId).emit('force_to_lobby'); io.to(roomId).emit('update_lobby', sanitizeRoom(room));
-                } else {
-                    if (room.turnIndex === idx) { room.turnIndex = room.turnIndex % room.players.length; room.phase = 'draw'; startTurnTimer(roomId); } 
-                    else if (room.turnIndex > idx) { room.turnIndex--; }
-                    io.to(roomId).emit('update_game', sanitizeRoom(room));
-                }
+                if (room.players.length < 2) { clearTimeout(room.turnTimer); room.state = 'waiting'; room.players.forEach(p => p.inLobby = true); io.to(roomId).emit('force_to_lobby'); io.to(roomId).emit('update_lobby', sanitizeRoom(room)); } 
+                else { if (room.turnIndex === idx) { room.turnIndex = room.turnIndex % room.players.length; room.phase = 'draw'; startTurnTimer(roomId); } else if (room.turnIndex > idx) { room.turnIndex--; } io.to(roomId).emit('update_game', sanitizeRoom(room)); }
             } else {
-                if (room.state === 'finished' && room.players.every(p => p.inLobby)) {
-                    room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = [];
-                    room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
-                }
+                if (room.state === 'finished' && room.players.every(p => p.inLobby)) { room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = []; room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; }); }
                 io.to(roomId).emit('update_lobby', sanitizeRoom(room));
             }
         }
@@ -350,6 +293,7 @@ const handleLeaveRoom = (socket, roomId) => {
     return changed;
 };
 
+// --- 5. SOCKETS ---
 io.on('connection', (socket) => {
     
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
@@ -360,22 +304,13 @@ io.on('connection', (socket) => {
         const existingSpectator = room.spectators.find(s => s.name === name);
 
         if (room.state === 'playing' || room.state === 'finished') {
-            if (existingPlayer) {
-                existingPlayer.id = socket.id; socket.join(roomId); socket.emit('room_joined', { roomId });
-                if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
-                return io.to(roomId).emit('update_game', sanitizeRoom(room));
-            } else if (existingSpectator) {
-                existingSpectator.id = socket.id; socket.join(roomId); socket.emit('room_joined', { roomId });
-                return io.to(roomId).emit('update_game', sanitizeRoom(room));
-            } else {
-                room.spectators.push({ id: socket.id, name, character: '👀', lastMsg: '', msgCount: 0, mutedUntil: 0 });
-                socket.join(roomId); socket.emit('room_joined', { roomId }); broadcastPublicRooms();
-                return io.to(roomId).emit('update_game', sanitizeRoom(room));
-            }
+            if (existingPlayer) { existingPlayer.id = socket.id; socket.join(roomId); socket.emit('room_joined', { roomId }); if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); return io.to(roomId).emit('update_game', sanitizeRoom(room)); } 
+            else if (existingSpectator) { existingSpectator.id = socket.id; socket.join(roomId); socket.emit('room_joined', { roomId }); return io.to(roomId).emit('update_game', sanitizeRoom(room)); } 
+            else { room.spectators.push({ id: socket.id, name, character: '👀', lastMsg: '', msgCount: 0, mutedUntil: 0 }); socket.join(roomId); socket.emit('room_joined', { roomId }); broadcastPublicRooms(); return io.to(roomId).emit('update_game', sanitizeRoom(room)); }
         }
 
-        if (existingPlayer) return socket.emit('error_msg', '⚠️ Nickname ocupado en esta mesa.');
-        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ La mesa está llena.');
+        if (existingPlayer) return socket.emit('error_msg', '⚠️ Nickname ocupado.');
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Mesa llena.');
 
         room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '' });
         socket.join(roomId); socket.emit('room_joined', { roomId }); io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
@@ -395,7 +330,7 @@ io.on('connection', (socket) => {
 
     socket.on('select_character', ({ roomId, character }) => {
         const room = rooms[roomId]; if (!room) return;
-        if (room.players.some(p => p.character === character)) return socket.emit('error_msg', '⚠️ Personaje ocupado.');
+        if (room.players.some(p => p.character === character)) return socket.emit('error_msg', '⚠️ Ocupado.');
         const player = room.players.find(p => p.id === socket.id);
         if (player) { player.character = character; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
     });
@@ -403,12 +338,12 @@ io.on('connection', (socket) => {
     socket.on('toggle_ready', (roomId) => {
         const room = rooms[roomId]; if (!room) return;
         const player = room.players.find(p => p.id === socket.id);
-        if (player) { if (!player.character) return socket.emit('error_msg', '⚠️ Elige un personaje primero.'); player.ready = !player.ready; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
+        if (player) { if (!player.character) return socket.emit('error_msg', '⚠️ Selecciona un personaje.'); player.ready = !player.ready; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
     });
 
     socket.on('start_game', (roomId) => {
         const room = rooms[roomId];
-        if (!room || room.players[0].id !== socket.id || !room.players.every(p => p.ready && p.inLobby) || room.players.length < 2) return socket.emit('error_msg', '⚠️ Todos deben estar listos en el lobby para iniciar.');
+        if (!room || room.players[0].id !== socket.id || !room.players.every(p => p.ready && p.inLobby) || room.players.length < 2) return socket.emit('error_msg', '⚠️ Todos listos para iniciar.');
 
         room.state = 'playing'; room.deck = createDeck(room.jokerCount); room.discardPile = []; room.exposedGroups = [];
         room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId); if (room.turnIndex === -1) room.turnIndex = 0;
@@ -426,8 +361,7 @@ io.on('connection', (socket) => {
         if (player && !player.surrendered) {
             player.surrendered = true; room.discardPile.push(...player.hand); player.hand = [];
             let activePlayers = room.players.filter(p => !p.surrendered);
-            if (activePlayers.length <= 1) { forceGameOver(roomId, null); } 
-            else { if (room.players[room.turnIndex].id === socket.id) nextTurn(roomId); else io.to(roomId).emit('update_game', sanitizeRoom(room)); }
+            if (activePlayers.length <= 1) { forceGameOver(roomId, null); } else { if (room.players[room.turnIndex].id === socket.id) nextTurn(roomId); else io.to(roomId).emit('update_game', sanitizeRoom(room)); }
         }
     });
 
@@ -436,11 +370,7 @@ io.on('connection', (socket) => {
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
             player.inLobby = true; socket.emit('force_to_lobby'); 
-            if (room.players.every(p => p.inLobby)) {
-                room.state = 'waiting';
-                room.deck = []; room.discardPile = []; room.exposedGroups = [];
-                room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; });
-            }
+            if (room.players.every(p => p.inLobby)) { room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = []; room.players.forEach(p => { p.hand = []; p.ready = false; p.surrendered = false; }); }
             io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
         }
     });
@@ -451,18 +381,10 @@ io.on('connection', (socket) => {
 
         if (source === 'deck') {
             if (room.deck.length === 0) {
-                if (room.discardPile.length > 1) {
-                    const topDiscard = room.discardPile.pop();
-                    room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard];
-                } else { return socket.emit('error_msg', '⚠️ No hay más cartas.'); }
+                if (room.discardPile.length > 1) { const topDiscard = room.discardPile.pop(); room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard]; } else { return socket.emit('error_msg', '⚠️ No hay cartas.'); }
             }
             let card = room.deck.pop();
-            if (card) {
-                player.hand.push(card); 
-                room.phase = 'discard';
-                startTurnTimer(roomId); 
-                socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-            }
+            if (card) { player.hand.push(card); room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room)); }
         }
     });
 
@@ -474,26 +396,16 @@ io.on('connection', (socket) => {
         let cardsForMeld = player.hand.filter(c => selectedIds.includes(c.id));
         
         let tempCards = cardsForMeld.map(c => ({...c}));
-        tempCards.forEach(c => {
-            if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
-        });
+        tempCards.forEach(c => { if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); } });
         tempCards.push(topCard);
 
         if (isValidMelding(tempCards)) {
-            room.discardPile.pop();
-            player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
-            cardsForMeld.forEach(c => {
-                if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
-            });
+            room.discardPile.pop(); player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
+            cardsForMeld.forEach(c => { if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); } });
             cardsForMeld.push(topCard);
-
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
-            room.phase = 'discard';
-            startTurnTimer(roomId); 
-            socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-        } else { 
-            socket.emit('error_msg', '⚠️ Combinación Inválida. El Joker sigue en tu mano.'); 
-        }
+            room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
+        } else { socket.emit('error_msg', '⚠️ Combinación Inválida. El Joker sigue en tu mano.'); }
     });
 
     socket.on('discard', ({ roomId, cardId }) => {
@@ -501,11 +413,7 @@ io.on('connection', (socket) => {
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
-        if (cardIdx > -1) {
-            const card = player.hand.splice(cardIdx, 1)[0];
-            room.discardPile.push(card);
-            socket.emit('update_hand', player.hand); nextTurn(roomId);
-        }
+        if (cardIdx > -1) { const card = player.hand.splice(cardIdx, 1)[0]; room.discardPile.push(card); socket.emit('update_hand', player.hand); nextTurn(roomId); }
     });
 
     socket.on('plug_card', ({ roomId, groupId, cardId }) => {
@@ -513,15 +421,13 @@ io.on('connection', (socket) => {
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
         const group = room.exposedGroups.find(g => g.id === groupId);
-        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ El grupo ya tiene el máximo de 4 cartas.');
+        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ Grupo lleno.');
 
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
         if (group && cardIdx > -1) {
             let card = player.hand[cardIdx];
-            if (canPlugIn(group.cards, card)) {
-                player.hand.splice(cardIdx, 1); group.cards.push(card);
-                socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-            } else { socket.emit('error_msg', '⚠️ No engancha aquí.'); }
+            if (canPlugIn(group.cards, card)) { player.hand.splice(cardIdx, 1); group.cards.push(card); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room)); } 
+            else { socket.emit('error_msg', '⚠️ No engancha aquí.'); }
         }
     });
 
@@ -534,13 +440,8 @@ io.on('connection', (socket) => {
 
         const cardIdx = group.cards.findIndex(c => c.id === cardId);
         if (cardIdx > -1) {
-            const card = group.cards.splice(cardIdx, 1)[0];
-            player.hand.push(card);
-
-            if (group.cards.length < 3 || !isValidMelding(group.cards)) {
-                player.hand.push(...group.cards);
-                room.exposedGroups.splice(groupIdx, 1);
-            }
+            const card = group.cards.splice(cardIdx, 1)[0]; player.hand.push(card);
+            if (group.cards.length < 3 || !isValidMelding(group.cards)) { player.hand.push(...group.cards); room.exposedGroups.splice(groupIdx, 1); }
             socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
     });
@@ -548,47 +449,31 @@ io.on('connection', (socket) => {
     socket.on('reorder_hand', ({ roomId, newOrder }) => {
         const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
         const player = room.players.find(p => p.id === socket.id);
-        if (player) {
-            player.hand.sort((a, b) => {
-                let idxA = newOrder.indexOf(a.id); let idxB = newOrder.indexOf(b.id);
-                return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
-            });
-        }
+        if (player) { player.hand.sort((a, b) => { let idxA = newOrder.indexOf(a.id); let idxB = newOrder.indexOf(b.id); return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB); }); }
     });
 
     socket.on('knock', (roomId) => {
         const room = rooms[roomId]; const knocker = room.players.find(p => p.id === socket.id);
         if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
-
         if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear al inicio de tu turno, ANTES de robar.');
-        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Tu turno terminó mal, no puedes golpear ahora.');
+        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Termina tu descarte.');
 
         let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
         let hasInHand = hasValidGroup(knocker.hand);
-        
-        if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ No puedes golpear sin tener al menos un juego válido.');
+        if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ Debes tener al menos un juego válido.');
         forceGameOver(roomId, socket.id); 
     });
 
     socket.on('send_chat', ({ roomId, msg }) => {
         const room = rooms[roomId]; if (!room) return;
         let player = room.players.find(p => p.id === socket.id) || room.spectators.find(s => s.id === socket.id);
-        if (!player) return;
-        io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character || '👀' });
+        if (!player) return; io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character || '👀' });
     });
 
     socket.on('taunt_card', ({ roomId, cardId }) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
         const card = player.hand.find(c => c.id === cardId);
         if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
-    });
-
-    socket.on('vote_kick_player', ({ roomId, targetName }) => {
-        const room = rooms[roomId]; if(!room) return;
-        const target = room.players.find(p => p.name === targetName);
-        if(target) {
-             io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Se ha solicitado expulsar a ${targetName}.`, character: '🚨' });
-        }
     });
 
     socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
