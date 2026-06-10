@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- TÍTULO ACTUALIZADO -->
+    <!-- TITULO CORREGIDO -->
     <title>GOLPE ONLINE</title>
     <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
     <style>
@@ -46,7 +46,6 @@
         .setting-item { display: flex; flex-direction: column; text-align: left;}
         .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold;}
 
-        /* TABLERO: SE AJUSTA PARA NO EMPUJAR LAS CARTAS HACIA ABAJO */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; width: 100%; height: 100%; box-sizing: border-box; }
         .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; z-index: 1; padding: 10px; box-sizing: border-box;}
         
@@ -86,9 +85,9 @@
 
         .next-turn-display { position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,0.7); border: 1px solid var(--cyan-neon); padding: 5px 10px; border-radius: 8px; font-size: 11px; z-index: 10; text-align: center;}
         
-        .taunt-popup { position: absolute; top: 50%; left: 50%; margin-top:-40px; margin-left:-27px; z-index: 999; pointer-events: none; }
+        /* BURLA CORREGIDA PARA IR AL CENTRO */
+        .taunt-popup { position: absolute; top: -20px; left: 50%; margin-left: -27px; z-index: 9999; pointer-events: none; }
         
-        /* PANEL INFERIOR FIJO: NO SE REDUCE CON LA MESA */
         .bottom-panel { display: flex; flex-direction: column; align-items: center; width: 100%; background: linear-gradient(to top, var(--bg-dark) 85%, transparent); padding-bottom: max(5px, env(safe-area-inset-bottom)); flex-shrink: 0; z-index: 50; }
         .status-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: 98%; max-width: 700px; margin-bottom: 5px; }
         .status-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 15px; border: 1px solid var(--border-glass); }
@@ -101,7 +100,6 @@
         
         .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 10px 5px; min-height: 90px; width: 95%; max-width: 800px; }
 
-        /* CHAT BASE PARA PC */
         #chatBox { position: fixed; right: 15px; bottom: 15px; width: 260px; background: rgba(15, 12, 28, 0.95); border: 1px solid var(--border-glass); border-radius: 8px; z-index: 9999; display: flex; flex-direction: column; padding: 6px; }
         .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid var(--border-glass); font-size: 12px; color: var(--cyan-neon); }
         .chat-header h4 { margin: 0; }
@@ -115,7 +113,6 @@
         .chat-emotes { display: flex; gap: 5px; justify-content: center; }
         .emote-btn { background: #111021; border: 1px solid var(--border-glass); border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0; color: white;}
 
-        /* MODAL JOKER TRANSPARENTE */
         #jokerModal {
             background: rgba(10, 5, 20, 0.75) !important; backdrop-filter: blur(8px);
             border: 2px solid var(--cyan-neon); padding: 15px; border-radius: 15px;
@@ -128,7 +125,6 @@
         .joker-suit-btn.selected { border-color: var(--magenta-neon); }
 
         @media (max-width: 480px) {
-            /* ADAPTACIÓN MÓVIL (CARTAS DINÁMICAS Y CHAT SUPERIOR) */
             :root { --card-w: 12vw; --card-h: 18vw; }
             .poker-table { max-height: 38vh; border-width: 8px;}
             .card-back::after { font-size: 20px; }
@@ -136,13 +132,8 @@
             .avatar-icon { width: 35px; height: 35px; font-size: 18px;}
             .hand-container { min-height: 70px; gap: 3px;}
             
-            /* CHAT MOVIDO ARRIBA PARA NO TAPAR LAS CARTAS EN CELULAR */
-            #chatBox { 
-                top: 75px; /* Aparece justo debajo del "Next Turn" */
-                bottom: auto !important; 
-                right: 10px; 
-                width: 220px; 
-            }
+            /* CHAT TOTALMENTE ELEVADO PARA MÓVIL */
+            #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatMessages { max-height: 100px; }
         }
@@ -152,7 +143,6 @@
 
     <!-- LOGIN -->
     <div class="container" id="authScreen">
-        <!-- TÍTULO ACTUALIZADO -->
         <h1 class="western-title">🤠 GOLPE ONLINE 🃏</h1>
         <input type="text" id="authUsername" placeholder="Nickname">
         <div class="pwd-container">
@@ -235,7 +225,6 @@
             </div>
         </div>
         
-        <!-- PANEL INFERIOR FIJO -->
         <div class="bottom-panel" id="playerControlPanel">
             <div class="status-container">
                 <div id="localAvatarArea"></div>
@@ -250,7 +239,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE JOKER -->
     <div class="container hidden" id="jokerModal">
         <h3 style="color:var(--cyan-neon); margin:0 0 10px 0;">🃏 Configurar Joker</h3>
         <p style="font-size:12px; margin-bottom:10px;">Selecciona Número y Palo:</p>
@@ -268,9 +256,14 @@
         <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:15px; width:100%;">Cerrar Ventana</button>
     </div>
 
-    <div class="container hidden" id="victoryModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:999;">
+    <!-- RESULTADOS FINALES: CON GRUPOS EN MESA VISIBLES -->
+    <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px;">
         <h2 style="color:var(--magenta-neon); margin:0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
-        <p id="knockerName"></p><h3 id="victoryAlert" style="color:var(--cyan-neon);"></h3>
+        <p id="knockerName"></p><h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0;"></h3>
+        
+        <h4 style="margin: 5px 0; color:#fff; font-size:12px;">Juegos en la Mesa:</h4>
+        <div id="modalExposedGroups" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:10px; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.5); padding:5px; border-radius:8px;"></div>
+        
         <table style="width:100%; margin-bottom:15px;" id="modalScoreBody"></table>
         <div style="display:flex; gap:10px;">
             <button onclick="returnToIndividualLobby()">Volver a la Sala</button>
@@ -279,7 +272,7 @@
     </div>
 
     <div class="container hidden" id="rankingModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:999;">
-        <h2>🏆 Top 10</h2><div id="rankingList"></div>
+        <h2>🏆 Top Global</h2><div id="rankingList"></div>
         <button onclick="document.getElementById('rankingModal').classList.add('hidden')" style="margin-top:10px;">Cerrar</button>
     </div>
 
@@ -298,7 +291,6 @@
         <button onclick="document.getElementById('storeModal').classList.add('hidden')" style="margin-top:15px; border-color:#7f8c8d; color:#7f8c8d;">Cerrar Tienda</button>
     </div>
 
-    <!-- CHAT FLOTANTE CON CONFIGURACIÓN DE RECONEXIÓN -->
     <div id="chatBox" class="minimized hidden" onclick="if(this.classList.contains('minimized')) this.classList.remove('minimized')">
         <div class="chat-header" onclick="event.stopPropagation(); document.getElementById('chatBox').classList.add('minimized')"><h4>💬 Chat</h4><span>▼</span></div>
         <div id="chatMessages"></div>
@@ -314,13 +306,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // CONFIGURACIÓN ANTI-DESCONEXIONES EN EL CLIENTE
-        const socket = io({
-            reconnection: true,
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            timeout: 20000
-        });
+        const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000, timeout: 20000 });
         
         let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, soyEspectador = false;
         let selectedCards = [], myHandData = [], activeRoomHistory = [];
@@ -392,6 +378,32 @@
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
                 socket.emit('discard', { roomId: currentRoomId, cardId: selectedCards[0] }); selectedCards = [];
             } else { socket.emit('knock', currentRoomId); }
+        }
+
+        // --- APERTURA DE TIENDA Y RANKING PÚBLICA ---
+        function openStore() {
+            document.getElementById('storeModal').classList.remove('hidden');
+            document.getElementById('storeMyPoints').innerText = loggedUser ? loggedUser.points : 0;
+        }
+
+        async function openRanking() {
+            document.getElementById('rankingModal').classList.remove('hidden');
+            const list = document.getElementById('rankingList'); list.innerHTML = 'Cargando...';
+            const res = await fetch('/api/ranking'); const data = await res.json();
+            list.innerHTML = data.map((u, i) => `<div style="padding:4px 0; border-bottom:1px solid var(--border-glass);"><strong>#${i+1}</strong> ${u.username} - ${u.victories} ganadas</div>`).join('');
+        }
+
+        async function buyItem(type, item, price) {
+            if(!loggedUser || loggedUser.isGuest) return alert('¡Crea una cuenta registrada para poder comprar en la tienda!');
+            const res = await fetch('/api/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: loggedUser.username, item, price, type }) });
+            const data = await res.json();
+            if(res.ok) {
+                loggedUser.points = data.points; 
+                if(type === 'char') loggedUser.unlockedChars = data.unlockedChars;
+                if(type === 'effect') { loggedUser.activeEffect = data.activeEffect; document.getElementById('profileName').className = loggedUser.activeEffect; }
+                document.getElementById('profilePoints').innerText = loggedUser.points; document.getElementById('storeMyPoints').innerText = loggedUser.points;
+                alert("¡Compra exitosa!");
+            } else { alert(data.error); }
         }
 
         function showJokerModal() {
@@ -474,14 +486,33 @@
 
         socket.on('show_taunt', ({ playerId, card }) => {
             let avatarDiv = document.getElementById(`avatar-${playerId}`); if (!avatarDiv && playerId === socket.id && !soyEspectador) avatarDiv = document.getElementById('localAvatarArea'); if (!avatarDiv) return;
+            
             const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + (card.rank==='Joker'?'joker':card.suit);
-            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; avatarDiv.appendChild(popup); playSound('taunt');
-            const rect = avatarDiv.getBoundingClientRect(); const avatarCenterX = rect.left + rect.width / 2; const avatarCenterY = rect.top + rect.height / 2;
-            const diffX = (window.innerWidth / 2) - avatarCenterX; const diffY = (window.innerHeight / 2) - avatarCenterY;
-            const length = Math.sqrt(diffX*diffX + diffY*diffY); const moveDistance = 90; 
-            const moveX = length > 0 ? (diffX / length) * moveDistance : 0; const moveY = length > 0 ? (diffY / length) * moveDistance : -50; 
-            popup.animate([ { opacity: 0, transform: `translate(0px, 0px) scale(0.5)` }, { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1)`, offset: 0.15 }, { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1)`, offset: 0.8 }, { opacity: 0, transform: `translate(${moveX * 1.2}px, ${moveY * 1.2}px) scale(0.8)` } ], { duration: 3000, fill: 'forwards' });
-            setTimeout(() => popup.remove(), 3000);
+            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; 
+            avatarDiv.appendChild(popup); playSound('taunt');
+            
+            // CORRECCIÓN BURLA: Calcular distancia hacia el centro de la mesa
+            const table = document.querySelector('.poker-table');
+            const tableRect = table.getBoundingClientRect();
+            const avatarRect = avatarDiv.getBoundingClientRect();
+            const tableCX = tableRect.left + tableRect.width / 2;
+            const tableCY = tableRect.top + tableRect.height / 2;
+            const avatarCX = avatarRect.left + avatarRect.width / 2;
+            const avatarCY = avatarRect.top + avatarRect.height / 2;
+            const diffX = tableCX - avatarCX;
+            const diffY = tableCY - avatarCY;
+            
+            // Movemos la carta un porcentaje del camino hacia el centro
+            const moveX = diffX * 0.45; 
+            const moveY = diffY * 0.45; 
+
+            popup.animate([ 
+                { opacity: 0, transform: `translate(0px, 0px) scale(0.2)` }, 
+                { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1.3)`, offset: 0.2 }, 
+                { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1.3)`, offset: 0.8 }, 
+                { opacity: 0, transform: `translate(${moveX}px, ${moveY}px) scale(0.5)` } 
+            ], { duration: 2500, fill: 'forwards' });
+            setTimeout(() => popup.remove(), 2500);
         });
 
         socket.on('room_joined', ({ roomId }) => { currentRoomId = roomId; document.getElementById('lobby').classList.add('hidden'); });
@@ -577,7 +608,7 @@
 
             orderedOpponents.forEach((p, index) => {
                 const pos = getSeatPosition(index, orderedOpponents.length); const isTurn = room.turnId === p.id;
-                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon">${p.character || '❓'}</div><div class="avatar-name ${p.activeEffect}">${p.name}</div></div>`;
+                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon">${p.character || '❓'}</div><div class="avatar-name ${p.activeEffect}">${p.name}</div></div>`;
             });
 
             miTurno = (room.turnId === socket.id);
@@ -595,17 +626,29 @@
             });
         });
 
-        socket.on('game_over', ({ scores, knocker, winner }) => {
+        socket.on('game_over', ({ scores, knocker, winner, exposedGroups }) => {
             document.getElementById('knockerName').innerText = `Golpeó la mesa: ${knocker}`;
             document.getElementById('victoryAlert').innerText = `Ganador de la Ronda: ${winner}`;
-            const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             
+            // CORRECCIÓN: MOSTRAR GRUPOS DE LA MESA
+            const exposedDiv = document.getElementById('modalExposedGroups');
+            exposedDiv.innerHTML = '';
+            if (exposedGroups && exposedGroups.length > 0) {
+                exposedGroups.forEach(g => {
+                    let cardsHtml = g.cards.map(c => `<span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.65); margin-right:-15px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`).join('');
+                    exposedDiv.innerHTML += `<div style="display:inline-block; background:rgba(0,0,0,0.5); padding:5px; margin:5px; border-radius:5px; border:1px solid var(--magenta-neon);"><div style="font-size:10px; color:var(--cyan-neon);">${g.ownerName}</div><div style="display:flex; padding-right:15px;">${cardsHtml}</div></div>`;
+                });
+            } else {
+                exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>';
+            }
+
+            const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
                 let handHtml = s.finalHand.map(c => `
-                    <span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.8); margin-right:-10px; pointer-events:none;">
-                        <div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div>
+                    <span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;">
+                        <div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div>
                     </span>`).join('');
-                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
+                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
         });
