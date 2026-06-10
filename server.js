@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const server = http.createServer(app);
 
-// CONFIGURACIÓN ANTI-DESCONEXIONES
+// CONFIGURACIÓN ANTI-DESCONEXIONES PARA CELULARES
 const io = new Server(server, {
     pingTimeout: 120000, 
     pingInterval: 25000, 
@@ -103,13 +103,13 @@ const createDeck = (jokerCount) => {
 
 const isValidMelding = (cards) => {
     if (cards.length < 3) return false;
-    let jokers = cards.filter(c => c.rank === 'Joker').length;
-    let normals = cards.filter(c => c.rank !== 'Joker');
+    let jokers = cards.filter(c => c.id.includes('Joker')).length;
+    let normals = cards.filter(c => !c.id.includes('Joker'));
     if (normals.length === 0) return true;
 
     if (normals.every(c => c.rank === normals[0].rank)) {
         let uniqueSuits = new Set(normals.map(c => c.suit)).size;
-        if (uniqueSuits + jokers === cards.length && cards.length <= 4) return true;
+        if (uniqueSuits + jokers >= cards.length && cards.length <= 4) return true;
     }
 
     if (normals.every(c => c.suit === normals[0].suit)) {
@@ -145,7 +145,8 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     let bestRemainingHand = hand;
 
     function evaluate(currentHand, currentTableGroups) {
-        let score = currentHand.reduce((acc, c) => acc + c.value, 0); // EL JOKER VALE 0 Y NO QUITA CARTAS
+        // Los Jokers valen 0, no quitan cartas.
+        let score = currentHand.reduce((acc, c) => acc + (c.id.includes('Joker') ? 0 : c.value), 0); 
         if (score < bestScore) { bestScore = score; bestRemainingHand = [...currentHand]; }
 
         let subsets = getSubsets(currentHand, 3);
@@ -172,19 +173,18 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     
     evaluate(hand, exposedGroups || []);
     
-    // Extraer las cartas que sí formaron grupo
     let meldedCards = [...hand];
     for (let card of bestRemainingHand) {
         let idx = meldedCards.findIndex(c => c.id === card.id);
         if (idx > -1) meldedCards.splice(idx, 1);
     }
     
-    bestRemainingHand.sort((a, b) => b.value - a.value); // Ordena las cartas sueltas para mejor visibilidad
+    bestRemainingHand.sort((a, b) => b.value - a.value); 
     
-    return { score: bestScore, orderedHand: [...meldedCards, ...bestRemainingHand] }; // Retorna juegos armados primero y cartas muertas después
+    return { score: bestScore, orderedHand: [...meldedCards, ...bestRemainingHand] }; 
 };
 
-const hasValidGroup = (hand) => getOptimalFinalScoreAndHand(hand, []).score < hand.reduce((sum, c) => sum + c.value, 0);
+const hasValidGroup = (hand) => getOptimalFinalScoreAndHand(hand, []).score < hand.reduce((sum, c) => sum + (c.id.includes('Joker') ? 0 : c.value), 0);
 const canPlugIn = (group, card) => isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
@@ -218,7 +218,7 @@ const executeAutoPlay = (roomId) => {
         let card = room.deck.pop(); if (card) player.hand.push(card);
     }
     
-    let candidates = player.hand.filter(c => c.rank !== 'Joker');
+    let candidates = player.hand.filter(c => !c.id.includes('Joker'));
     if (candidates.length === 0 && player.hand.length > 0) candidates = player.hand;
 
     if (candidates.length > 0) {
@@ -293,7 +293,6 @@ const handleLeaveRoom = (socket, roomId) => {
     return changed;
 };
 
-// --- 5. SOCKETS ---
 io.on('connection', (socket) => {
     
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
@@ -396,12 +395,17 @@ io.on('connection', (socket) => {
         let cardsForMeld = player.hand.filter(c => selectedIds.includes(c.id));
         
         let tempCards = cardsForMeld.map(c => ({...c}));
-        tempCards.forEach(c => { if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); } });
+        tempCards.forEach(c => {
+            if (c.id.includes('Joker') && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
+        });
         tempCards.push(topCard);
 
         if (isValidMelding(tempCards)) {
-            room.discardPile.pop(); player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
-            cardsForMeld.forEach(c => { if (c.rank === 'Joker' && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); } });
+            room.discardPile.pop();
+            player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
+            cardsForMeld.forEach(c => {
+                if (c.id.includes('Joker') && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
+            });
             cardsForMeld.push(topCard);
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
@@ -455,7 +459,7 @@ io.on('connection', (socket) => {
     socket.on('knock', (roomId) => {
         const room = rooms[roomId]; const knocker = room.players.find(p => p.id === socket.id);
         if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
-        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Solo puedes golpear al inicio de tu turno, ANTES de robar.');
+        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Golpea al inicio de tu turno, ANTES de robar.');
         if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Termina tu descarte.');
 
         let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
@@ -474,6 +478,12 @@ io.on('connection', (socket) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
         const card = player.hand.find(c => c.id === cardId);
         if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
+    });
+
+    socket.on('vote_kick_player', ({ roomId, targetName }) => {
+        const room = rooms[roomId]; if(!room) return;
+        const target = room.players.find(p => p.name === targetName);
+        if(target) { io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Se solicitó expulsar a ${targetName}.`, character: '🚨' }); }
     });
 
     socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
