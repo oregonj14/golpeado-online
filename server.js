@@ -7,10 +7,10 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const server = http.createServer(app);
 
-// CONFIGURACIÓN ANTI-DESCONEXIONES PARA MÓVILES
+// CONFIGURACIÓN ANTI-DESCONEXIONES
 const io = new Server(server, {
-    pingTimeout: 120000, // Tolera hasta 2 minutos de micro-cortes
-    pingInterval: 25000, // Mantiene la conexión viva constantemente
+    pingTimeout: 120000, 
+    pingInterval: 25000, 
     connectionStateRecovery: {
         maxDisconnectionDuration: 2 * 60 * 1000,
         skipMiddlewares: true
@@ -21,7 +21,6 @@ app.use(express.json());
 app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.use(express.static(__dirname));
 
-// --- CONEXIÓN A LA BASE DE DATOS ---
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saloon_golpeado';
 mongoose.connect(MONGO_URI)
     .then(() => console.log('📦 Base de Datos MongoDB Conectada con éxito'))
@@ -30,7 +29,6 @@ mongoose.connect(MONGO_URI)
         console.error(err.message);
     });
 
-// --- ESQUEMA DE USUARIOS ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -42,7 +40,6 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// --- RUTAS API ---
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -63,7 +60,6 @@ app.post('/api/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
 
-        // PARCHE: Garantizar los 5 personajes iniciales a cuentas antiguas
         const personajesIniciales = ['🤠', '🤖', '💀', '🦊', '🦁'];
         let actualizoInventario = false;
         personajesIniciales.forEach(char => {
@@ -77,8 +73,9 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/ranking', async (req, res) => {
     try {
-        const topUsers = await User.find({}, 'username victories').sort({ victories: -1 }).limit(10);
-        res.status(200).json(topUsers);
+        // CORRECCIÓN: Traer a todas las personas registradas, ordenadas por victorias
+        const allUsers = await User.find({}, 'username victories').sort({ victories: -1 }).limit(100);
+        res.status(200).json(allUsers);
     } catch (error) { res.status(500).json({ error: 'Error al cargar el ranking' }); }
 });
 
@@ -198,10 +195,6 @@ const getOptimalFinalScore = (hand, exposedGroups) => {
                             let rem = cards.filter((_, idx) => idx !== i && idx !== j && idx !== k);
                             minScore = Math.min(minScore, evaluate(rem, jokers, tableGroups));
                         }
-                        if (jokers >= 1 && isValidMelding([cards[i], cards[j], cards[k], {rank:'Joker'}])) {
-                            let rem = cards.filter((_, idx) => idx !== i && idx !== j && idx !== k);
-                            minScore = Math.min(minScore, evaluate(rem, jokers - 1, tableGroups));
-                        }
                     }
                 }
             }
@@ -320,7 +313,8 @@ const forceGameOver = async (roomId, knockerId) => {
 
     try { if (mongoose.connection.readyState === 1) { await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } }); } } catch (e) { console.error(e); }
 
-    io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado });
+    // CORRECCIÓN: Emitir también los exposedGroups actuales a todos
+    io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado, exposedGroups: room.exposedGroups });
     io.to(roomId).emit('update_lobby', sanitizeRoom(room)); 
 };
 
@@ -356,7 +350,6 @@ const handleLeaveRoom = (socket, roomId) => {
     return changed;
 };
 
-// --- 5. SOCKETS ---
 io.on('connection', (socket) => {
     
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
@@ -467,13 +460,12 @@ io.on('connection', (socket) => {
             if (card) {
                 player.hand.push(card); 
                 room.phase = 'discard';
-                startTurnTimer(roomId); // SE REINICIA EL TIEMPO AL ROBAR
+                startTurnTimer(roomId); 
                 socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
             }
         }
     });
 
-    // LÓGICA DE JOKER FLEXIBLE BLINDADA: No te quita la carta si fallas
     socket.on('pick_discard_with_meld', ({ roomId, selectedIds, jokerRank, jokerSuit }) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
@@ -497,7 +489,7 @@ io.on('connection', (socket) => {
 
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard';
-            startTurnTimer(roomId); // SE REINICIA EL TIEMPO
+            startTurnTimer(roomId); 
             socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
         } else { 
             socket.emit('error_msg', '⚠️ Combinación Inválida. El Joker sigue en tu mano.'); 
