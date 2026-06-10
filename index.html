@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- TITULO CORREGIDO -->
     <title>GOLPE ONLINE</title>
     <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
     <style>
@@ -85,7 +84,6 @@
 
         .next-turn-display { position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,0.7); border: 1px solid var(--cyan-neon); padding: 5px 10px; border-radius: 8px; font-size: 11px; z-index: 10; text-align: center;}
         
-        /* BURLA CORREGIDA PARA IR AL CENTRO */
         .taunt-popup { position: absolute; top: -20px; left: 50%; margin-left: -27px; z-index: 9999; pointer-events: none; }
         
         .bottom-panel { display: flex; flex-direction: column; align-items: center; width: 100%; background: linear-gradient(to top, var(--bg-dark) 85%, transparent); padding-bottom: max(5px, env(safe-area-inset-bottom)); flex-shrink: 0; z-index: 50; }
@@ -250,13 +248,7 @@
         </div>
     </div>
 
-    <div class="container hidden" id="historyDetailsModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:10000; background:rgba(15,10,25,0.95); border:2px solid var(--cyan-neon);">
-        <h2 style="color:var(--cyan-neon); margin:0 0 15px 0;">🂡 Cartas de la Partida</h2>
-        <div id="historyDetailsContent" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
-        <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:15px; width:100%;">Cerrar Ventana</button>
-    </div>
-
-    <!-- RESULTADOS FINALES: CON GRUPOS EN MESA VISIBLES -->
+    <!-- RESULTADOS FINALES CON JUEGOS EN MESA VISIBLES -->
     <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px;">
         <h2 style="color:var(--magenta-neon); margin:0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
         <p id="knockerName"></p><h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0;"></h3>
@@ -380,7 +372,6 @@
             } else { socket.emit('knock', currentRoomId); }
         }
 
-        // --- APERTURA DE TIENDA Y RANKING PÚBLICA ---
         function openStore() {
             document.getElementById('storeModal').classList.remove('hidden');
             document.getElementById('storeMyPoints').innerText = loggedUser ? loggedUser.points : 0;
@@ -462,21 +453,6 @@
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) btn.innerText = "DESCARTAR"; else btn.innerText = "¡GOLPE!";
         }
 
-        function openHistoryDetails(index) {
-            const match = activeRoomHistory[index]; if(!match || !match.allHands) return;
-            const modal = document.getElementById('historyDetailsModal');
-            const content = document.getElementById('historyDetailsContent'); content.innerHTML = '';
-            
-            match.allHands.forEach(p => {
-                let cardsHtml = p.hand.map(c => {
-                    let sClass = c.rank === 'Joker' ? 'joker' : c.suit;
-                    return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.85); margin-right:-5px; pointer-events:none;"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
-                }).join('');
-                content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
-            });
-            modal.classList.remove('hidden');
-        }
-
         function tauntCard() {
             if (selectedCards.length === 1) { 
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); 
@@ -491,7 +467,6 @@
             popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; 
             avatarDiv.appendChild(popup); playSound('taunt');
             
-            // CORRECCIÓN BURLA: Calcular distancia hacia el centro de la mesa
             const table = document.querySelector('.poker-table');
             const tableRect = table.getBoundingClientRect();
             const avatarRect = avatarDiv.getBoundingClientRect();
@@ -502,7 +477,6 @@
             const diffX = tableCX - avatarCX;
             const diffY = tableCY - avatarCY;
             
-            // Movemos la carta un porcentaje del camino hacia el centro
             const moveX = diffX * 0.45; 
             const moveY = diffY * 0.45; 
 
@@ -550,7 +524,6 @@
                 histList.innerHTML = activeRoomHistory.map((h, i) => `
                     <div style="background:rgba(0,0,0,0.4); padding:8px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                         <div>Ganador: <strong>${h.winner}</strong> (${h.score} pts)</div>
-                        <button onclick="openHistoryDetails(${i})" style="width:auto; padding:3px 8px; font-size:11px; margin:0;">🔍 Ver Mano de Todos</button>
                     </div>`).join('');
             }
 
@@ -626,11 +599,10 @@
             });
         });
 
-        socket.on('game_over', ({ scores, knocker, winner, exposedGroups }) => {
+        socket.on('game_over', ({ scores, knocker, winner, exposedGroups, wasVolteado }) => {
             document.getElementById('knockerName').innerText = `Golpeó la mesa: ${knocker}`;
             document.getElementById('victoryAlert').innerText = `Ganador de la Ronda: ${winner}`;
             
-            // CORRECCIÓN: MOSTRAR GRUPOS DE LA MESA
             const exposedDiv = document.getElementById('modalExposedGroups');
             exposedDiv.innerHTML = '';
             if (exposedGroups && exposedGroups.length > 0) {
@@ -638,9 +610,7 @@
                     let cardsHtml = g.cards.map(c => `<span class="card ${c.rank==='Joker'?'joker':c.suit}" style="display:inline-flex; transform:scale(0.65); margin-right:-15px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`).join('');
                     exposedDiv.innerHTML += `<div style="display:inline-block; background:rgba(0,0,0,0.5); padding:5px; margin:5px; border-radius:5px; border:1px solid var(--magenta-neon);"><div style="font-size:10px; color:var(--cyan-neon);">${g.ownerName}</div><div style="display:flex; padding-right:15px;">${cardsHtml}</div></div>`;
                 });
-            } else {
-                exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>';
-            }
+            } else { exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>'; }
 
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
