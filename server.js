@@ -98,28 +98,21 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
-// MOTOR MATEMÁTICO STRICTO (Jokers asignados son RÍGIDOS)
+// MOTOR MATEMÁTICO STRICTO 
 const isValidMelding = (cards) => {
     if (cards.length < 3 || cards.length > 4) return false;
-    
-    // Solo los Jokers SIN ASIGNAR (rank === 'Joker') actúan como comodines invisibles
     let jokers = cards.filter(c => c.id.includes('Joker') && c.rank === 'Joker').length;
-    
-    // Los Jokers que ya tienen un valor asignado (ej. 10♥) actúan como cartas normales rígidas
     let normals = cards.filter(c => !(c.id.includes('Joker') && c.rank === 'Joker'));
-    
     if (normals.length <= 1) return true;
 
     if (normals.every(c => c.rank === normals[0].rank)) {
         let uniqueSuits = new Set(normals.map(c => c.suit)).size;
-        // Previene meter un 10♥ si ya hay un Joker disfrazado de 10♥
         if (uniqueSuits === normals.length) return true; 
     }
 
     if (normals.every(c => c.suit === normals[0].suit)) {
         const checkSeq = (vals) => {
             let sorted = [...vals].sort((a, b) => a - b);
-            // Si hay un número duplicado (ej. un 9♥ real y un Joker disfrazado de 9♥), es INVÁLIDO
             if (new Set(sorted).size !== sorted.length) return false; 
             let gaps = 0;
             for (let i = 0; i < sorted.length - 1; i++) gaps += (sorted[i+1] - sorted[i] - 1);
@@ -200,7 +193,7 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     return { score: bestScore, orderedHand: bestArrangement }; 
 };
 
-// AUTO-DISFRAZ DE JOKERS PARA LA INTELIGENCIA ARTIFICIAL
+// AUTO-DISFRAZ DE JOKERS
 const inferJokers = (group) => {
     let jokers = group.filter(c => c.id.includes('Joker') && c.rank === 'Joker');
     let normals = group.filter(c => !(c.id.includes('Joker') && c.rank === 'Joker'));
@@ -270,7 +263,7 @@ const startTurnTimer = (roomId) => {
 const executeBotPlay = (roomId, bot) => {
     const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
     
-    // 1. REGLA ESTRICTA: El Bot evalúa si gana y golpea ANTES de robar (Solo con 7 cartas)
+    // REGLA: GOLPEAR ANTES DE ROBAR
     if (bot.hand.length <= 7) {
         let optStart = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
         let hasExposed = room.exposedGroups.some(g => g.ownerName === bot.name);
@@ -283,10 +276,10 @@ const executeBotPlay = (roomId, bot) => {
     }
 
     setTimeout(() => {
-        // 2. FASE DE ROBO: Roba del pozo si puede armar algo (Lvl 3+) o del mazo normal.
         let tookDiscard = false;
         let topDiscard = room.discardPile[room.discardPile.length - 1];
         
+        // REGLA: El bot SOLO muestra grupo nuevo si roba del pozo
         if (topDiscard && bot.difficulty >= 3) {
             let handSubsets = getSubsetsBySize(bot.hand, [2, 3]);
             for (let sub of handSubsets) {
@@ -311,47 +304,31 @@ const executeBotPlay = (roomId, bot) => {
         io.to(roomId).emit('update_game', sanitizeRoom(room));
 
         setTimeout(() => {
-            // 3. INTELIGENCIA DE MESA: Bajar grupos propios y Enchufar (Lvl 4 y 5)
+            // INTELIGENCIA DE MESA: Enchufar cartas sueltas en grupos existentes (Lvl 4+)
             if (bot.difficulty >= 4) {
                 let madeChange = true;
                 while(madeChange) {
                     madeChange = false;
-                    // Intenta bajar grupos de su mano a la mesa
-                    let subsets = getSubsets(bot.hand);
-                    for (let sub of subsets) {
-                        if (isValidMelding(sub)) {
-                            inferJokers(sub);
-                            room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: bot.name, cards: sub });
-                            bot.hand = bot.hand.filter(c => !sub.some(sc => sc.id === c.id));
-                            madeChange = true; break;
-                        }
-                    }
-                    // Intenta enchufar cartas sueltas en grupos existentes
-                    if (bot.difficulty === 5) {
-                        for (let i = 0; i < bot.hand.length; i++) {
-                            for (let g = 0; g < room.exposedGroups.length; g++) {
-                                let grp = room.exposedGroups[g];
-                                if (grp.cards.length < 4 && isValidMelding([...grp.cards, bot.hand[i]])) {
-                                    let pluggedCard = bot.hand.splice(i, 1)[0];
-                                    if(pluggedCard.id.includes('Joker')){ pluggedCard.rank = grp.cards[0].rank; pluggedCard.suit = grp.cards[0].suit; }
-                                    grp.cards.push(pluggedCard); madeChange = true; break;
-                                }
+                    for (let i = 0; i < bot.hand.length; i++) {
+                        for (let g = 0; g < room.exposedGroups.length; g++) {
+                            let grp = room.exposedGroups[g];
+                            if (grp.cards.length < 4 && isValidMelding([...grp.cards, bot.hand[i]])) {
+                                let pluggedCard = bot.hand.splice(i, 1)[0];
+                                if(pluggedCard.id.includes('Joker')){ pluggedCard.rank = grp.cards[0].rank; pluggedCard.suit = grp.cards[0].suit; }
+                                grp.cards.push(pluggedCard); madeChange = true; break;
                             }
-                            if(madeChange) break;
                         }
+                        if(madeChange) break;
                     }
                 }
             }
 
-            // 4. DESCARTE INTELIGENTE
             let finalOpt = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
             let cardToDiscard;
             
             if (bot.difficulty >= 2 && finalOpt.orderedHand.length > 0) {
                 let deadCards = finalOpt.orderedHand.filter(c => c.role === 'dead');
-                if (deadCards.length > 0) {
-                    cardToDiscard = deadCards[0]; // Bota la carta muerta más alta
-                } else { cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)]; }
+                if (deadCards.length > 0) { cardToDiscard = deadCards[0]; } else { cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)]; }
             } else { cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)]; }
             
             if (!cardToDiscard) cardToDiscard = bot.hand[0];
@@ -397,7 +374,8 @@ const forceGameOver = async (roomId, knockerId) => {
     const scores = room.players.map(p => {
         let opt = getOptimalFinalScoreAndHand(p.hand, room.exposedGroups);
         let finalScore = p.surrendered ? opt.score + 20 : opt.score;
-        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0 };
+        // Se añade explícitamente el estado surrendered para la tabla
+        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0, surrendered: p.surrendered };
     });
 
     let knockerName = 'Mesa Cerrada'; let wasVolteado = false;
@@ -466,6 +444,7 @@ io.on('connection', (socket) => {
         if (existingPlayer) {
             existingPlayer.id = socket.id; existingPlayer.offline = false;
             socket.join(roomId); socket.emit('room_joined', { roomId }); 
+            io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `✅ ${name} se reconectó.`, character: '🔌' });
             if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
             return io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
@@ -485,7 +464,7 @@ io.on('connection', (socket) => {
 
     socket.on('join_as_player', (roomId) => {
         const room = rooms[roomId]; if (!room || room.state !== 'waiting') return;
-        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ La mesa ya está llena.');
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Mesa llena.');
         const specIdx = room.spectators.findIndex(s => s.id === socket.id);
         if (specIdx > -1) {
             const spec = room.spectators.splice(specIdx, 1)[0];
@@ -503,8 +482,13 @@ io.on('connection', (socket) => {
     socket.on('add_bot', ({ roomId, level }) => {
         const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id) return;
         if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Mesa llena.');
+        
+        // NOMBRADO CORRECTO Y DINÁMICO DE BOTS
+        let botCount = room.players.filter(p => p.isBot).length + 1;
+        let botName = `Bot ${botCount} (Lvl ${level})`;
+        
         let colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6']; let color = colors[parseInt(level) - 1] || '#fff';
-        room.players.push({ id: 'bot_'+Math.random().toString(36).substring(7), isBot: true, difficulty: parseInt(level), name: `Bot Lvl ${level}`, character: '👾', ready: true, surrendered: false, hand: [], offline: false, inLobby: true, activeEffect: `color: ${color}; text-shadow: 0 0 5px ${color};` });
+        room.players.push({ id: 'bot_'+Math.random().toString(36).substring(7), isBot: true, difficulty: parseInt(level), name: botName, character: '👾', ready: true, surrendered: false, hand: [], offline: false, inLobby: true, activeEffect: `color: ${color}; text-shadow: 0 0 5px ${color};` });
         io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
     });
 
@@ -601,7 +585,7 @@ io.on('connection', (socket) => {
             cardsForMeld.push(topCard);
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-        } else { socket.emit('error_msg', '⚠️ Combinación Inválida. Revisa tu grupo.'); }
+        } else { socket.emit('error_msg', '⚠️ Combinación Inválida.'); }
     });
 
     socket.on('discard', ({ roomId, cardId }) => {
@@ -641,7 +625,6 @@ io.on('connection', (socket) => {
         const cardIdx = group.cards.findIndex(c => c.id === cardId);
         if (cardIdx > -1) {
             const card = group.cards.splice(cardIdx, 1)[0]; 
-            // RESTAURA LA IDENTIDAD DEL JOKER AL REGRESAR A LA MANO
             if (card.id.includes('Joker')) { card.rank = 'Joker'; card.suit = 'none'; card.value = 0; }
             player.hand.push(card);
 
