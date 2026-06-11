@@ -70,7 +70,7 @@
         @keyframes discardAnim { 0% { transform: scale(1.1) translateY(-10px); opacity: 1; } 100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; } }
         .card-discarding { animation: discardAnim 0.3s forwards ease-in; z-index: 999 !important; pointer-events: none; }
 
-        .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-height: 15vh; overflow-y: auto;}
+        .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-height: 12vh; overflow-y: auto;}
         .exposed-group { display: inline-flex; background: rgba(0,0,0,0.6); padding: 3px 5px; border-radius: 6px; border: 1px solid var(--magenta-neon); cursor: pointer; }
         
         .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 10; }
@@ -121,34 +121,24 @@
         .joker-suit-btn { background: #fff; padding: 4px 12px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; font-size: 18px; width: auto; margin:0;}
         .joker-suit-btn.selected { border-color: var(--magenta-neon); }
 
-        /* EFECTOS VISUALES PARA ENCHUFES EN RESULTADOS */
-        .card-plugged {
-            transform: scale(0.8) translateY(-10px) !important;
-            box-shadow: 0 0 20px #00ff00, inset 0 0 10px #00ff00 !important;
-            border: 3px solid #00ff00 !important;
-            z-index: 5;
-        }
-        .card-plugged::after {
-            content: "Enchufe";
-            position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
-            background: #00ff00; color: black; font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; text-shadow: none;
-        }
-        .card-dead { opacity: 0.45 !important; transform: scale(0.7) !important; }
-
+        /* OPTIMIZACIÓN EXTREMA PARA CELULARES */
         @media (max-width: 480px) {
             :root { --card-w: 12vw; --card-h: 18vw; }
-            .poker-table { max-height: 38vh; border-width: 8px;}
+            /* Se hace la mesa un poco más baja y ancha para dar espacio */
+            .poker-table { max-height: 40vh; border-width: 5px; width: 96%; padding: 5px;}
             .card-back::after { font-size: 20px; }
             .status-bar button { padding: 4px 8px; font-size: 10px;}
             
-            /* ACHICAMOS AVATARES Y MESA PARA QUE NO SE CRUCEN EN MÓVIL */
-            .avatar-icon { width: 30px; height: 30px; font-size: 14px;}
-            .avatar-name { font-size: 9px; padding: 2px 4px; margin-top: -4px;}
-            .exposed-group { padding: 2px; }
-            .exposed-group .card { transform: scale(0.65); margin: 0 -8px; } 
-            .exposed-groups-container { max-height: 14vh; }
+            /* ACHICAMOS AVATARES AÚN MÁS PARA QUE NO TAPEN LAS CARTAS */
+            .avatar-icon { width: 28px; height: 28px; font-size: 14px; border-width: 1px;}
+            .avatar-name { font-size: 8px; padding: 1px 3px; margin-top: -3px;}
+            
+            /* COMPACTAMOS LOS GRUPOS EXPUESTOS DE LA MESA */
+            .exposed-group { padding: 1px 3px; }
+            .exposed-group .card { transform: scale(0.55); margin: 0 -10px; } 
+            .exposed-groups-container { max-height: 16vh; gap: 4px;}
 
-            .hand-container { min-height: 70px; gap: 3px;}
+            .hand-container { min-height: 65px; gap: 2px;}
             #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatMessages { max-height: 100px; }
@@ -507,6 +497,27 @@
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) btn.innerText = "DESCARTAR"; else btn.innerText = "¡GOLPE!";
         }
 
+        function openHistoryDetails(index) {
+            const match = activeRoomHistory[index]; if(!match || !match.allHands) return;
+            const modal = document.getElementById('historyDetailsModal');
+            const content = document.getElementById('historyDetailsContent'); content.innerHTML = '';
+            
+            match.allHands.forEach(p => {
+                let cardsHtml = p.hand.map(c => {
+                    let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
+                    
+                    let transformStr = c.role === 'plug' ? 'scale(0.85) translateY(-5px)' : 'scale(0.85)';
+                    let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 10px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
+                    let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
+                    let marginStr = c.role === 'plug' ? 'margin-right: -2px;' : 'margin-right: -5px;';
+                    
+                    return `<span class="card ${sClass}" style="display:inline-flex; transform:${transformStr}; ${marginStr}; pointer-events:none; ${borderStr} ${opacityStr}"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
+                }).join('');
+                content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
+            });
+            modal.classList.remove('hidden');
+        }
+
         function tauntCard() {
             if (selectedCards.length === 1) { 
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); 
@@ -638,11 +649,12 @@
             el.addEventListener('touchend', () => { if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; } const newOrder = [...document.getElementById('myHand').children].map(c => c.id); socket.emit('reorder_hand', { roomId: currentRoomId, newOrder }); });
         }
 
+        // COORDENADAS REAJUSTADAS PARA EVITAR CHOQUES CON LA MESA
         function getSeatPosition(index, totalOthers) {
-            if (totalOthers === 1) return { top: '10%', left: '50%', transform: 'translateX(-50%)' };
-            if (totalOthers === 2) { if (index === 0) return { top: '25%', left: '85%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '25%', left: '15%' }; }
-            if (totalOthers === 3) { if (index === 0) return { top: '40%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '40%', left: '10%' }; }
-            if (totalOthers >= 4) { if (index === 0) return { top: '50%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '75%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '15%', left: '25%' }; if (index === 3) return { top: '50%', left: '10%' }; }
+            if (totalOthers === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
+            if (totalOthers === 2) { if (index === 0) return { top: '15%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '10%' }; }
+            if (totalOthers === 3) { if (index === 0) return { top: '35%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '35%', left: '5%' }; }
+            if (totalOthers >= 4) { if (index === 0) return { top: '45%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '10%', left: '80%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '10%', left: '20%' }; if (index === 3) return { top: '45%', left: '5%' }; }
             return { top: '0', left: '0' };
         }
 
@@ -694,12 +706,16 @@
             scores.forEach(s => {
                 let handHtml = '';
                 if(s.finalHand.length === 0) {
-                    handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
+                    // CORRECCIÓN DEL MENSAJE DE RETIRO
+                    if (s.surrendered) {
+                        handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
+                    } else {
+                        handHtml = '<span style="font-size:11px; color:#2ecc71;">(Cartas en la mesa)</span>';
+                    }
                 } else {
                     handHtml = s.finalHand.map(c => { 
                         const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
                         
-                        // EFECTOS VISUALES PARA ENCHUFES EN LA TABLA
                         let transformStr = c.role === 'plug' ? 'scale(0.8) translateY(-8px)' : 'scale(0.7)';
                         let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 15px #00ff00, inset 0 0 5px #00ff00; border: 2px solid #00ff00; z-index: 5;' : '';
                         let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
