@@ -7,14 +7,11 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const server = http.createServer(app);
 
-// CONFIGURACIÓN ANTI-DESCONEXIONES PARA CELULARES
+// CONFIGURACIÓN ANTI-DESCONEXIONES
 const io = new Server(server, {
     pingTimeout: 120000, 
     pingInterval: 25000, 
-    connectionStateRecovery: {
-        maxDisconnectionDuration: 2 * 60 * 1000,
-        skipMiddlewares: true
-    }
+    connectionStateRecovery: { maxDisconnectionDuration: 2 * 60 * 1000, skipMiddlewares: true }
 });
 
 app.use(express.json());
@@ -101,60 +98,93 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
+// --- MOTOR MATEMÁTICO CORREGIDO ---
 const isValidMelding = (cards) => {
-    if (cards.length < 3) return false;
+    // REGLA 1: Ningún grupo puede superar las 4 cartas. Mínimo 3.
+    if (cards.length < 3 || cards.length > 4) return false;
+
     let jokers = cards.filter(c => c.id.includes('Joker')).length;
     let normals = cards.filter(c => !c.id.includes('Joker'));
-    if (normals.length === 0) return true;
 
+    // REGLA 2: Si el grupo son puros Jokers (ej: 3 Jokers) o 1 normal y el resto Jokers, SIEMPRE es válido.
+    if (normals.length <= 1) return true;
+
+    // Validación de Ternas/Cuartetos (Igual número, distinto palo)
     if (normals.every(c => c.rank === normals[0].rank)) {
         let uniqueSuits = new Set(normals.map(c => c.suit)).size;
-        if (uniqueSuits + jokers >= cards.length && cards.length <= 4) return true;
+        if (uniqueSuits === normals.length) return true; // No pueden haber palos repetidos en normales
     }
 
+    // Validación de Escaleras (Mismo palo)
     if (normals.every(c => c.suit === normals[0].suit)) {
-        let normalRanks = normals.map(c => c.rank);
-        let valuesLow = normals.map(c => { if (c.rank === 'A') return 1; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13); return parseInt(c.rank); }).sort((a, b) => a - b);
-        let hasDupLow = new Set(valuesLow).size !== valuesLow.length;
-        let gapsLow = 0;
-        if (!hasDupLow) { for (let i = 0; i < valuesLow.length - 1; i++) { gapsLow += (valuesLow[i+1] - valuesLow[i] - 1); } if (gapsLow <= jokers) return true; }
+        const checkSeq = (vals) => {
+            let sorted = [...vals].sort((a, b) => a - b);
+            if (new Set(sorted).size !== sorted.length) return false; // Prohibido números duplicados en escaleras
+            let gaps = 0;
+            for (let i = 0; i < sorted.length - 1; i++) gaps += (sorted[i+1] - sorted[i] - 1);
+            return gaps <= jokers; // Los huecos se rellenan con Jokers
+        };
 
-        let valuesHigh = normals.map(c => { if (c.rank === 'A') return 14; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank === 'J' ? 11 : (c.rank === 'Q' ? 12 : 13); return parseInt(c.rank); }).sort((a, b) => a - b);
-        let hasDupHigh = new Set(valuesHigh).size !== valuesHigh.length;
-        let gapsHigh = 0;
-        if (!hasDupHigh) { for (let i = 0; i < valuesHigh.length - 1; i++) { gapsHigh += (valuesHigh[i+1] - valuesHigh[i] - 1); } if (gapsHigh <= jokers) return true; }
-        
-        let isSpecialWrap = normalRanks.every(r => ['K', 'A', '2'].includes(r)) && (normalRanks.includes('K') || normalRanks.includes('2'));
-        if (isSpecialWrap && (normals.length + jokers >= 3)) return true;
+        // Escenario A: Escalera normal/baja (El As vale 1)
+        let valLow = normals.map(c => {
+            if (c.rank === 'A') return 1;
+            if (['J', 'Q', 'K'].includes(c.rank)) return c.rank==='J'?11 : c.rank==='Q'?12 : 13;
+            return parseInt(c.rank);
+        });
+        if (checkSeq(valLow)) return true;
+
+        // Escenario B: Escalera Alta (El As vale 14, el 2 vale 15)
+        let valHigh = normals.map(c => {
+            if (c.rank === 'A') return 14;
+            if (c.rank === '2') return 15; // Permite el combo K, A, 2
+            if (['J', 'Q', 'K'].includes(c.rank)) return c.rank==='J'?11 : c.rank==='Q'?12 : 13;
+            return parseInt(c.rank);
+        });
+        // La regla [K, A, 2, 3] fallará automáticamente aquí porque el 3 seguirá valiendo 3, 
+        // generando un "hueco" de 10 puntos (del 3 al 13 de la K) que no se puede llenar con jokers.
+        if (checkSeq(valHigh)) return true;
     }
     return false;
 };
 
-// --- MOTOR RECURSIVO MATEMÁTICO DE CONTEO PERFECTO ---
-const getSubsets = (array, minSize) => {
+// Generador EXCLUSIVO de subgrupos de 3 y 4 cartas
+const getSubsets = (array) => {
     let subsets = [];
     const generate = (current, start) => {
-        if (current.length >= minSize) subsets.push([...current]);
-        for (let i = start; i < array.length; i++) { current.push(array[i]); generate(current, i + 1); current.pop(); }
+        if (current.length === 3 || current.length === 4) subsets.push([...current]);
+        if (current.length === 4) return; // Limitar profundidad a 4
+        for (let i = start; i < array.length; i++) {
+            current.push(array[i]);
+            generate(current, i + 1);
+            current.pop();
+        }
     };
     generate([], 0); return subsets;
 };
 
 const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     let bestScore = Infinity;
-    let bestRemainingHand = hand;
+    let bestArrangement = [];
 
-    function evaluate(currentHand, currentTableGroups) {
-        // Los Jokers valen 0, no quitan cartas.
-        let score = currentHand.reduce((acc, c) => acc + (c.id.includes('Joker') ? 0 : c.value), 0); 
-        if (score < bestScore) { bestScore = score; bestRemainingHand = [...currentHand]; }
+    function evaluate(currentHand, currentTableGroups, currentFormedGroups) {
+        // REGLA 3: Los Jokers sobrantes valen 0 puntos y NO borran cartas normales.
+        let score = currentHand.reduce((acc, c) => acc + (c.id.includes('Joker') ? 0 : c.value), 0);
+        
+        if (score < bestScore) { 
+            bestScore = score; 
+            // ORDENAMIENTO VISUAL: Guarda los grupos formados primero, y al final las cartas muertas.
+            let sortedLeftovers = [...currentHand].sort((a, b) => b.value - a.value);
+            bestArrangement = [];
+            currentFormedGroups.forEach(g => { bestArrangement.push(...g); });
+            bestArrangement.push(...sortedLeftovers);
+        }
 
-        let subsets = getSubsets(currentHand, 3);
+        let subsets = getSubsets(currentHand);
         for (let subset of subsets) {
             if (isValidMelding(subset)) {
                 let remaining = [...currentHand];
                 for (let card of subset) { let idx = remaining.findIndex(c => c.id === card.id); remaining.splice(idx, 1); }
-                evaluate(remaining, currentTableGroups);
+                evaluate(remaining, currentTableGroups, [...currentFormedGroups, subset]);
             }
         }
 
@@ -162,30 +192,22 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
             let card = currentHand[i];
             for (let g = 0; g < currentTableGroups.length; g++) {
                 let group = currentTableGroups[g];
+                // ENCHUFE EN LA MESA: El grupo destino NO puede superar las 4 cartas.
                 if (group.cards.length < 4 && isValidMelding([...group.cards, card])) {
                     let remainingHand = [...currentHand]; remainingHand.splice(i, 1);
                     let nextGroups = currentTableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, card] }; return tg; });
-                    evaluate(remainingHand, nextGroups);
+                    evaluate(remainingHand, nextGroups, currentFormedGroups);
                 }
             }
         }
     }
     
-    evaluate(hand, exposedGroups || []);
-    
-    let meldedCards = [...hand];
-    for (let card of bestRemainingHand) {
-        let idx = meldedCards.findIndex(c => c.id === card.id);
-        if (idx > -1) meldedCards.splice(idx, 1);
-    }
-    
-    bestRemainingHand.sort((a, b) => b.value - a.value); 
-    
-    return { score: bestScore, orderedHand: [...meldedCards, ...bestRemainingHand] }; 
+    evaluate(hand, exposedGroups || [], []);
+    return { score: bestScore, orderedHand: bestArrangement }; 
 };
 
 const hasValidGroup = (hand) => getOptimalFinalScoreAndHand(hand, []).score < hand.reduce((sum, c) => sum + (c.id.includes('Joker') ? 0 : c.value), 0);
-const canPlugIn = (group, card) => isValidMelding([...group, card]);
+const canPlugIn = (group, card) => group.length < 4 && isValidMelding([...group, card]);
 
 const sanitizeRoom = (room) => {
     let activePlayers = room.players.filter(p => !p.surrendered);
@@ -294,7 +316,6 @@ const handleLeaveRoom = (socket, roomId) => {
 };
 
 io.on('connection', (socket) => {
-    
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
 
     socket.on('join_room', ({ roomId, name, activeEffect }) => {
@@ -409,7 +430,7 @@ io.on('connection', (socket) => {
             cardsForMeld.push(topCard);
             room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
             room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
-        } else { socket.emit('error_msg', '⚠️ Combinación Inválida. El Joker sigue en tu mano.'); }
+        } else { socket.emit('error_msg', '⚠️ Combinación Inválida. Revisa tu grupo.'); }
     });
 
     socket.on('discard', ({ roomId, cardId }) => {
@@ -425,7 +446,7 @@ io.on('connection', (socket) => {
         if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
 
         const group = room.exposedGroups.find(g => g.id === groupId);
-        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ Grupo lleno.');
+        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ Grupo lleno (Máx 4).');
 
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
         if (group && cardIdx > -1) {
