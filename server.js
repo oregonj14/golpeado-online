@@ -262,7 +262,6 @@ const startTurnTimer = (roomId) => {
 const executeBotPlay = (roomId, bot) => {
     const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
     
-    // 1. REGLA ESTRICTA: Golpear ANTES de robar
     if (bot.hand.length <= 7) {
         let optStart = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
         let hasExposed = room.exposedGroups.some(g => g.ownerName === bot.name);
@@ -278,7 +277,6 @@ const executeBotPlay = (roomId, bot) => {
         let tookDiscard = false;
         let topDiscard = room.discardPile[room.discardPile.length - 1];
         
-        // 2. ROBAR DEL POZO (Única forma de mostrar grupo)
         if (topDiscard && bot.difficulty >= 3) {
             let handSubsets = getSubsetsBySize(bot.hand, [2, 3]);
             for (let sub of handSubsets) {
@@ -303,7 +301,6 @@ const executeBotPlay = (roomId, bot) => {
         io.to(roomId).emit('update_game', sanitizeRoom(room));
 
         setTimeout(() => {
-            // 3. INTELIGENCIA: Enchufar cartas sueltas en la mesa (Lvl 4+) SIN crear grupos nuevos
             if (bot.difficulty >= 4) {
                 let madeChange = true;
                 while(madeChange) {
@@ -322,7 +319,6 @@ const executeBotPlay = (roomId, bot) => {
                 }
             }
 
-            // 4. DESCARTE INTELIGENTE
             let finalOpt = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
             let cardToDiscard;
             
@@ -408,7 +404,14 @@ const handleLeaveRoom = (socket, roomId, forceRemove = false) => {
     if (idx > -1) {
         let player = room.players[idx];
         if (forceRemove || room.state === 'waiting' || player.isBot) {
+            let removedId = player.id;
             room.players.splice(idx, 1);
+            
+            // CORRECCIÓN: Si se va el Starter, reasignar al primero que quede
+            if (room.startingPlayerId === removedId && room.players.length > 0) {
+                room.startingPlayerId = room.players[0].id;
+            }
+
             if (room.players.filter(p => !p.isBot).length === 0) { 
                 clearTimeout(room.turnTimer); delete rooms[roomId]; 
             } else if (room.state === 'playing') {
@@ -472,7 +475,6 @@ io.on('connection', (socket) => {
 
     socket.on('create_room', ({ name, activeEffect }) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-        // Contador de bots interno añadido
         rooms[roomId] = { id: roomId, botCounter: 0, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '', isBot: false }], spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [], maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, turnTimer: null, timerExpires: 0 };
         socket.join(roomId); socket.emit('room_joined', { roomId }); io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId])); broadcastPublicRooms();
     });
@@ -492,7 +494,11 @@ io.on('connection', (socket) => {
     socket.on('remove_bot', ({ roomId, botId }) => {
         const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id || room.state !== 'waiting') return;
         const idx = room.players.findIndex(p => p.id === botId && p.isBot);
-        if (idx > -1) { room.players.splice(idx, 1); io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms(); }
+        if (idx > -1) { 
+            room.players.splice(idx, 1); 
+            if(room.startingPlayerId === botId && room.players.length > 0) room.startingPlayerId = room.players[0].id;
+            io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms(); 
+        }
     });
 
     socket.on('change_settings', ({ roomId, maxPlayers, jokerCount, startingPlayerId, turnTime }) => {
@@ -662,6 +668,12 @@ io.on('connection', (socket) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
         const card = player.hand.find(c => c.id === cardId);
         if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
+    });
+
+    socket.on('vote_kick_player', ({ roomId, targetName }) => {
+        const room = rooms[roomId]; let host = getRealHost(room); if(!room || !host || host.id !== socket.id) return socket.emit('error_msg', 'Solo el creador puede expulsar.');
+        handleLeaveRoom({ id: 'dummy' }, roomId, true); 
+        io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Expulsión en mantenimiento.`, character: '🚨' });
     });
 
     socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId, true)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
