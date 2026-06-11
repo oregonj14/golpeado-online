@@ -198,16 +198,21 @@
             </div>
         </div>
 
-        <div class="room-history-container">
-            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">📜 Historial de Partidas</h4>
-            <div id="roomHistoryList">Ninguna mano jugada aún.</div>
+        <div class="room-history-container" style="margin-top: 10px;">
+            <h4 id="charTitle">🎭 Elige tu personaje:</h4>
+            <div class="char-grid" id="charactersGrid"></div>
+            <div id="playerList"></div>
+            <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
         </div>
 
-        <h4>🎭 Elige tu personaje:</h4>
-        <div class="char-grid" id="charactersGrid"></div>
-        <div id="playerList"></div>
-        <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
-        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
+        <div class="room-history-container" style="margin-top: 10px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px;">
+            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">👀 Espectadores</h4>
+            <div id="spectatorList" style="font-size:12px;">Ninguno.</div>
+            <button id="joinFromSpecBtn" class="hidden" onclick="joinAsPlayer()" style="margin-top:8px; background:linear-gradient(#3498db, #2980b9); border-color:#fff; width:auto; padding:6px 12px; font-size:12px;">Unirse a la partida</button>
+        </div>
+
+        <!-- EL BOTÓN SE MOSTRARÁ AHORA CUANDO LOS BOTS ESTÉN LISTOS -->
+        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:15px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
     </div>
 
     <div class="board hidden" id="gameBoard">
@@ -249,6 +254,12 @@
         </div>
     </div>
 
+    <div class="container hidden" id="historyDetailsModal" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10000; background:rgba(15,10,25,0.95); border:2px solid var(--cyan-neon); width: 90%; max-height: 85dvh; display: flex; flex-direction: column;">
+        <h2 style="color:var(--cyan-neon); margin:0 0 10px 0; flex: 0 0 auto;">🂡 Cartas de la Partida</h2>
+        <div id="historyDetailsContent" style="text-align:left; flex: 1 1 auto; min-height: 0; overflow-y:auto; padding-right: 5px;"></div>
+        <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:10px; width:100%; flex: 0 0 auto;">Cerrar Ventana</button>
+    </div>
+
     <div class="container hidden" id="victoryModal" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9999; width:95%; max-width:550px; max-height: 85dvh; display: flex; flex-direction: column; padding: 15px; margin: 0; box-sizing: border-box; overflow: hidden;">
         
         <div style="flex: 0 0 auto;">
@@ -268,12 +279,6 @@
             <button onclick="returnToIndividualLobby()" style="padding:10px; font-size:12px;">Volver a la Sala</button>
             <button onclick="leaveRoom()" style="border-color:#c0392b; color:#c0392b; padding:10px; font-size:12px;">Salir de la Mesa</button>
         </div>
-    </div>
-
-    <div class="container hidden" id="historyDetailsModal" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10000; background:rgba(15,10,25,0.95); border:2px solid var(--cyan-neon); width: 90%; max-height: 85dvh; display: flex; flex-direction: column;">
-        <h2 style="color:var(--cyan-neon); margin:0 0 10px 0; flex: 0 0 auto;">🂡 Cartas de la Partida</h2>
-        <div id="historyDetailsContent" style="text-align:left; flex: 1 1 auto; min-height: 0; overflow-y:auto; padding-right: 5px;"></div>
-        <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:10px; width:100%; flex: 0 0 auto;">Cerrar Ventana</button>
     </div>
 
     <div class="container hidden" id="rankingModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:999;">
@@ -359,6 +364,8 @@
         function createRoom() { socket.emit('create_room', { name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
         function joinRoom() { const c = document.getElementById('roomCode').value.trim(); if(c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); } }
         function joinSpecificRoom(id) { currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
+
+        function joinAsPlayer() { socket.emit('join_as_player', currentRoomId); }
 
         function sendSettings() {
             if(!soyHost) return;
@@ -490,7 +497,12 @@
             match.allHands.forEach(p => {
                 let cardsHtml = p.hand.map(c => {
                     let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
-                    return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.85); margin-right:-5px; pointer-events:none;"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
+                    
+                    let tStr = c.role === 'plug' ? 'scale(0.85) translateY(-5px)' : 'scale(0.85)';
+                    let bStr = c.role === 'plug' ? 'box-shadow: 0 0 10px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
+                    let oStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
+                    
+                    return `<span class="card ${sClass}" style="display:inline-flex; transform:${tStr}; margin-right:-5px; pointer-events:none; ${bStr} ${oStr}"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
                 }).join('');
                 content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
             });
@@ -538,12 +550,16 @@
 
         socket.on('update_lobby', (room) => {
             soyHost = (room.hostId === socket.id); activeRoomHistory = room.history || [];
+            soyEspectador = room.spectators.some(s => s.id === socket.id);
+
             document.getElementById('waitingRoom').classList.remove('hidden'); document.getElementById('displayCode').innerText = room.id;
             
             if (soyHost) {
                 document.getElementById('hostSettingsArea').classList.remove('hidden'); document.getElementById('setTurnTime').value = room.turnTime || "30"; document.getElementById('setPlayers').value = room.maxPlayers || "5"; document.getElementById('setJokers').value = room.jokerCount || "2";
                 const selectStarter = document.getElementById('setStarter'); selectStarter.innerHTML = '';
                 room.players.forEach(p => { selectStarter.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+            } else {
+                document.getElementById('hostSettingsArea').classList.add('hidden');
             }
             
             const grid = document.getElementById('charactersGrid'); grid.innerHTML = '';
@@ -568,15 +584,29 @@
                 </div>`;
             });
 
-            const histList = document.getElementById('roomHistoryList');
-            if(activeRoomHistory.length > 0) {
-                histList.innerHTML = activeRoomHistory.map((h, i) => `
-                    <div style="background:rgba(0,0,0,0.4); padding:8px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-                        <div>Ganador: <strong>${h.winner}</strong> (${h.score} pts)</div>
-                        <button onclick="openHistoryDetails(${i})" style="width:auto; padding:3px 8px; font-size:11px; margin:0;">🔍 Ver Mano de Todos</button>
-                    </div>`).join('');
-            } else { histList.innerHTML = 'Ninguna mano jugada aún.'; }
+            const specList = document.getElementById('spectatorList');
+            specList.innerHTML = room.spectators.length > 0 
+                ? room.spectators.map(s => `<div><span style="${s.activeEffect}">👀 ${s.name}</span></div>`).join('') 
+                : '<span style="color:#aaa;">Ninguno.</span>';
 
+            const joinBtn = document.getElementById('joinFromSpecBtn');
+            if (soyEspectador && room.players.length < room.maxPlayers) {
+                joinBtn.classList.remove('hidden');
+            } else {
+                joinBtn.classList.add('hidden');
+            }
+
+            if (soyEspectador) {
+                document.getElementById('charactersGrid').classList.add('hidden');
+                document.getElementById('charTitle').classList.add('hidden');
+                document.getElementById('readyBtn').classList.add('hidden');
+            } else {
+                document.getElementById('charactersGrid').classList.remove('hidden');
+                document.getElementById('charTitle').classList.remove('hidden');
+                document.getElementById('readyBtn').classList.remove('hidden');
+            }
+
+            // AHORA EL BOTON SALE SIEMPRE QUE TODOS (INCLUYENDO BOTS) ESTEN LISTOS
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
         });
 
@@ -669,9 +699,19 @@
                 if(s.finalHand.length === 0) {
                     handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
                 } else {
-                    handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
+                    handHtml = s.finalHand.map(c => { 
+                        const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
+                        
+                        // EFECTO VISUAL PARA IDENTIFICAR ENCHUFES O CARTAS MUERTAS
+                        let transformStr = c.role === 'plug' ? 'scale(0.75) translateY(-8px)' : 'scale(0.7)';
+                        let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 15px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
+                        let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
+                        let marginStr = c.role === 'plug' ? 'margin-right: -8px;' : 'margin-right: -12px;';
+
+                        return `<span class="card ${sClass}" style="display:inline-flex; transform:${transformStr}; ${marginStr}; pointer-events:none; font-size:10px; ${borderStr} ${opacityStr}"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; 
+                    }).join('');
                 }
-                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
+                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px; margin-top:5px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold; vertical-align:middle;">${s.score} pts</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
         });
