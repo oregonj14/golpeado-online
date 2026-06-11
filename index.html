@@ -136,6 +136,7 @@
 </head>
 <body>
 
+    <!-- LOGIN -->
     <div class="container" id="authScreen">
         <h1 class="western-title">🤠 GOLPE ONLINE 🃏</h1>
         <input type="text" id="authUsername" placeholder="Nickname">
@@ -151,6 +152,7 @@
         <p id="authError" style="color:var(--magenta-neon); font-size:12px; font-weight:bold;"></p>
     </div>
 
+    <!-- LOBBY -->
     <div class="container hidden" id="lobby">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
             <div style="text-align:left;">
@@ -174,6 +176,7 @@
         </div>
     </div>
 
+    <!-- SALA DE ESPERA -->
     <div class="container hidden" id="waitingRoom">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <button onclick="leaveRoom()" style="border-color:#e74c3c; color:#e74c3c; width:auto;">⬅️ Salir al Lobby</button>
@@ -188,7 +191,6 @@
                 <div class="setting-item"> <label>⏱️ Tiempo de Turno</label> <select id="setTurnTime" onchange="sendSettings()"><option value="15">15s</option><option value="30" selected>30s</option><option value="45">45s</option><option value="60">60s</option></select> </div>
                 <div class="setting-item"> <label>🎲 Empieza</label> <select id="setStarter" onchange="sendSettings()"></select> </div>
                 
-                <!-- BOTÓN PARA AGREGAR BOTS -->
                 <div class="setting-item" style="grid-column: span 2;">
                     <label>🤖 Añadir Bot</label>
                     <div style="display:flex; gap:5px;">
@@ -200,18 +202,24 @@
             </div>
         </div>
 
-        <div class="room-history-container">
-            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">📜 Historial de Partidas</h4>
-            <div id="roomHistoryList">Ninguna mano jugada aún.</div>
+        <div class="room-history-container" style="margin-top: 10px;">
+            <h4 id="charTitle">🎭 Elige tu personaje:</h4>
+            <div class="char-grid" id="charactersGrid"></div>
+            <div id="playerList"></div>
+            <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
         </div>
 
-        <h4>🎭 Elige tu personaje:</h4>
-        <div class="char-grid" id="charactersGrid"></div>
-        <div id="playerList"></div>
-        <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
-        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
+        <!-- ZONA DE ESPECTADORES EN EL LOBBY -->
+        <div class="room-history-container" style="margin-top: 10px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px;">
+            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">👀 Espectadores</h4>
+            <div id="spectatorList" style="font-size:12px;">Ninguno.</div>
+            <button id="joinFromSpecBtn" class="hidden" onclick="joinAsPlayer()" style="margin-top:8px; background:linear-gradient(#3498db, #2980b9); border-color:#fff; width:auto; padding:6px 12px; font-size:12px;">Unirse a la partida</button>
+        </div>
+
+        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:15px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
     </div>
 
+    <!-- MESA DE JUEGO -->
     <div class="board hidden" id="gameBoard">
         <div class="poker-table-wrapper">
             <div class="next-turn-display">Próximo Turno:<br><strong id="nextTurnDisplay" style="color:var(--cyan-neon);">...</strong></div>
@@ -240,6 +248,7 @@
         </div>
     </div>
 
+    <!-- MODALES -->
     <div class="container hidden" id="jokerModal">
         <h3 style="color:var(--cyan-neon); margin:0 0 10px 0;">🃏 Configurar Joker</h3>
         <p style="font-size:12px; margin-bottom:10px;">Selecciona Número y Palo:</p>
@@ -251,21 +260,19 @@
         </div>
     </div>
 
-    <div class="container hidden" id="historyDetailsModal" style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); z-index:10000; background:rgba(15,10,25,0.95); border:2px solid var(--cyan-neon);">
-        <h2 style="color:var(--cyan-neon); margin:0 0 15px 0;">🂡 Cartas de la Partida</h2>
-        <div id="historyDetailsContent" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
-        <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:15px; width:100%;">Cerrar Ventana</button>
-    </div>
+    <!-- MODAL DE VICTORIA CON SCROLL -->
+    <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px; max-height: 90vh; display: flex; flex-direction: column;">
+        <h2 style="color:var(--magenta-neon); margin:0; flex-shrink: 0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
+        <p id="knockerName" style="flex-shrink: 0;"></p>
+        <h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0; flex-shrink: 0;"></h3>
+        
+        <div style="overflow-y: auto; padding-right: 5px; margin-bottom: 10px; flex: 1;">
+            <h4 style="margin: 5px 0; color:#fff; font-size:12px;">Juegos en la Mesa:</h4>
+            <div id="modalExposedGroups" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:10px; background:rgba(0,0,0,0.5); padding:5px; border-radius:8px;"></div>
+            <table style="width:100%; margin-bottom:0;" id="modalScoreBody"></table>
+        </div>
 
-    <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px;">
-        <h2 style="color:var(--magenta-neon); margin:0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
-        <p id="knockerName"></p><h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0;"></h3>
-        
-        <h4 style="margin: 5px 0; color:#fff; font-size:12px;">Juegos en la Mesa:</h4>
-        <div id="modalExposedGroups" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:10px; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.5); padding:5px; border-radius:8px;"></div>
-        
-        <table style="width:100%; margin-bottom:15px;" id="modalScoreBody"></table>
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:10px; flex-shrink: 0;">
             <button onclick="returnToIndividualLobby()">Volver a la Sala</button>
             <button onclick="leaveRoom()" style="border-color:#c0392b; color:#c0392b;">Salir de la Mesa</button>
         </div>
@@ -355,6 +362,8 @@
         function joinRoom() { const c = document.getElementById('roomCode').value.trim(); if(c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); } }
         function joinSpecificRoom(id) { currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
 
+        function joinAsPlayer() { socket.emit('join_as_player', currentRoomId); }
+
         function sendSettings() {
             if(!soyHost) return;
             socket.emit('change_settings', { roomId: currentRoomId, maxPlayers: document.getElementById('setPlayers').value, jokerCount: document.getElementById('setJokers').value, startingPlayerId: document.getElementById('setStarter').value, turnTime: document.getElementById('setTurnTime').value });
@@ -364,6 +373,11 @@
             if(!soyHost) return;
             const level = document.getElementById('botLevel').value;
             socket.emit('add_bot', { roomId: currentRoomId, level: level });
+        }
+
+        function removeBot(botId) {
+            if(!soyHost) return;
+            socket.emit('remove_bot', { roomId: currentRoomId, botId: botId });
         }
 
         function pickCharacter(char) { socket.emit('select_character', { roomId: currentRoomId, character: char }); }
@@ -472,21 +486,6 @@
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) btn.innerText = "DESCARTAR"; else btn.innerText = "¡GOLPE!";
         }
 
-        function openHistoryDetails(index) {
-            const match = activeRoomHistory[index]; if(!match || !match.allHands) return;
-            const modal = document.getElementById('historyDetailsModal');
-            const content = document.getElementById('historyDetailsContent'); content.innerHTML = '';
-            
-            match.allHands.forEach(p => {
-                let cardsHtml = p.hand.map(c => {
-                    let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
-                    return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.85); margin-right:-5px; pointer-events:none;"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
-                }).join('');
-                content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
-            });
-            modal.classList.remove('hidden');
-        }
-
         function tauntCard() {
             if (selectedCards.length === 1) { 
                 socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); 
@@ -528,12 +527,16 @@
 
         socket.on('update_lobby', (room) => {
             soyHost = (room.hostId === socket.id); activeRoomHistory = room.history || [];
+            soyEspectador = room.spectators.some(s => s.id === socket.id);
+
             document.getElementById('waitingRoom').classList.remove('hidden'); document.getElementById('displayCode').innerText = room.id;
             
             if (soyHost) {
                 document.getElementById('hostSettingsArea').classList.remove('hidden'); document.getElementById('setTurnTime').value = room.turnTime || "30"; document.getElementById('setPlayers').value = room.maxPlayers || "5"; document.getElementById('setJokers').value = room.jokerCount || "2";
                 const selectStarter = document.getElementById('setStarter'); selectStarter.innerHTML = '';
                 room.players.forEach(p => { selectStarter.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+            } else {
+                document.getElementById('hostSettingsArea').classList.add('hidden');
             }
             
             const grid = document.getElementById('charactersGrid'); grid.innerHTML = '';
@@ -550,15 +553,34 @@
             room.players.forEach(p => {
                 if(p.id===socket.id) miPersonaje = p.character; if (p.ready && p.inLobby) readyCount++;
                 let statusBadge = p.offline ? '📡 DESCONECTADO' : (p.ready ? '✅ LISTO' : '⏳ PENSANDO');
-                list.innerHTML += `<div class="player-list-item"><span class="${p.activeEffect}" style="${p.activeEffect}">${p.character || '❓'} ${p.name}</span><div>${statusBadge}</div></div>`;
+                let removeBtn = (soyHost && p.isBot) ? `<button onclick="removeBot('${p.id}')" style="background:#c0392b; border:none; padding:2px 6px; margin:0 0 0 5px; font-size:10px;">❌</button>` : '';
+
+                list.innerHTML += `<div class="player-list-item">
+                    <span class="${p.activeEffect}" style="${p.activeEffect}">${p.character || '❓'} ${p.name}</span>
+                    <div style="display:flex; align-items:center;">${statusBadge}${removeBtn}</div>
+                </div>`;
             });
 
-            const histList = document.getElementById('roomHistoryList');
-            if(activeRoomHistory.length > 0) {
-                histList.innerHTML = activeRoomHistory.map((h, i) => `
-                    <div style="background:rgba(0,0,0,0.4); padding:8px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-                        <div>Ganador: <strong>${h.winner}</strong> (${h.score} pts)</div>
-                    </div>`).join('');
+            const specList = document.getElementById('spectatorList');
+            specList.innerHTML = room.spectators.length > 0 
+                ? room.spectators.map(s => `<div><span style="${s.activeEffect}">👀 ${s.name}</span></div>`).join('') 
+                : '<span style="color:#aaa;">Ninguno.</span>';
+
+            const joinBtn = document.getElementById('joinFromSpecBtn');
+            if (soyEspectador && room.players.length < room.maxPlayers) {
+                joinBtn.classList.remove('hidden');
+            } else {
+                joinBtn.classList.add('hidden');
+            }
+
+            if (soyEspectador) {
+                document.getElementById('charactersGrid').classList.add('hidden');
+                document.getElementById('charTitle').classList.add('hidden');
+                document.getElementById('readyBtn').classList.add('hidden');
+            } else {
+                document.getElementById('charactersGrid').classList.remove('hidden');
+                document.getElementById('charTitle').classList.remove('hidden');
+                document.getElementById('readyBtn').classList.remove('hidden');
             }
 
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
