@@ -211,7 +211,7 @@
             <button id="joinFromSpecBtn" class="hidden" onclick="joinAsPlayer()" style="margin-top:8px; background:linear-gradient(#3498db, #2980b9); border-color:#fff; width:auto; padding:6px 12px; font-size:12px;">Unirse a la partida</button>
         </div>
 
-        <!-- EL BOTÓN SE MOSTRARÁ AHORA CUANDO LOS BOTS ESTÉN LISTOS -->
+        <!-- EL BOTÓN ESTÁ AQUÍ Y SE MOSTRARÁ CUANDO TODOS ESTÉN LISTOS -->
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:15px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
     </div>
 
@@ -260,8 +260,8 @@
         <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:10px; width:100%; flex: 0 0 auto;">Cerrar Ventana</button>
     </div>
 
+    <!-- MODAL DE VICTORIA CON SCROLL -->
     <div class="container hidden" id="victoryModal" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9999; width:95%; max-width:550px; max-height: 85dvh; display: flex; flex-direction: column; padding: 15px; margin: 0; box-sizing: border-box; overflow: hidden;">
-        
         <div style="flex: 0 0 auto;">
             <h2 style="color:var(--magenta-neon); margin:0; font-size:1.4rem;">💥 ¡ALGUIEN GOLPEÓ! 💥</h2>
             <p id="knockerName" style="margin:2px 0; font-size:11px;"></p>
@@ -271,7 +271,6 @@
         <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 5px; margin-bottom: 10px;">
             <h4 style="margin: 5px 0; color:#fff; font-size:12px;">Juegos en la Mesa:</h4>
             <div id="modalExposedGroups" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:10px; background:rgba(0,0,0,0.5); padding:5px; border-radius:8px;"></div>
-            
             <table style="width:100%; margin-bottom:0;" id="modalScoreBody"></table>
         </div>
 
@@ -498,11 +497,13 @@
                 let cardsHtml = p.hand.map(c => {
                     let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
                     
-                    let tStr = c.role === 'plug' ? 'scale(0.85) translateY(-5px)' : 'scale(0.85)';
-                    let bStr = c.role === 'plug' ? 'box-shadow: 0 0 10px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
-                    let oStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
+                    // EFECTO VISUAL PARA IDENTIFICAR ENCHUFES O CARTAS MUERTAS EN EL HISTORIAL
+                    let transformStr = c.role === 'plug' ? 'scale(0.85) translateY(-5px)' : 'scale(0.85)';
+                    let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 10px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
+                    let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
+                    let marginStr = c.role === 'plug' ? 'margin-right: -2px;' : 'margin-right: -5px;';
                     
-                    return `<span class="card ${sClass}" style="display:inline-flex; transform:${tStr}; margin-right:-5px; pointer-events:none; ${bStr} ${oStr}"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
+                    return `<span class="card ${sClass}" style="display:inline-flex; transform:${transformStr}; ${marginStr}; pointer-events:none; ${borderStr} ${opacityStr}"><div>${c.rank}</div><div>${suitIcons[c.suit]||'🃏'}</div><div></div></span>`;
                 }).join('');
                 content.innerHTML += `<div style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><strong>${p.character} ${p.name}:</strong><div style="display:flex; flex-wrap:wrap; margin-top:5px;">${cardsHtml}</div></div>`;
             });
@@ -576,7 +577,7 @@
             room.players.forEach(p => {
                 if(p.id===socket.id) miPersonaje = p.character; if (p.ready && p.inLobby) readyCount++;
                 let statusBadge = p.offline ? '📡 DESCONECTADO' : (p.ready ? '✅ LISTO' : '⏳ PENSANDO');
-                let removeBtn = (soyHost && p.isBot) ? `<button onclick="removeBot('${p.id}')" style="background:#c0392b; border:none; padding:2px 6px; margin:0 0 0 5px; font-size:10px;">❌</button>` : '';
+                let removeBtn = (soyHost && p.isBot) ? `<button onclick="removeBot('${p.id}')" style="background:#c0392b; border:none; padding:2px 6px; margin:0 0 0 5px; font-size:10px; cursor:pointer;">❌</button>` : '';
 
                 list.innerHTML += `<div class="player-list-item">
                     <span class="${p.activeEffect}" style="${p.activeEffect}">${p.character || '❓'} ${p.name}</span>
@@ -606,7 +607,7 @@
                 document.getElementById('readyBtn').classList.remove('hidden');
             }
 
-            // AHORA EL BOTON SALE SIEMPRE QUE TODOS (INCLUYENDO BOTS) ESTEN LISTOS
+            // MUESTRA EL BOTÓN REPARTIR SI TODOS LOS JUGADORES (HUMANOS Y BOTS) ESTÁN LISTOS
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
         });
 
@@ -702,7 +703,7 @@
                     handHtml = s.finalHand.map(c => { 
                         const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
                         
-                        // EFECTO VISUAL PARA IDENTIFICAR ENCHUFES O CARTAS MUERTAS
+                        // EFECTO VISUAL DE ENCHUFE (PLUG) Y CARTAS MUERTAS (DEAD) EN LA TABLA FINAL
                         let transformStr = c.role === 'plug' ? 'scale(0.75) translateY(-8px)' : 'scale(0.7)';
                         let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 15px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
                         let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
