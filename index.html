@@ -65,10 +65,9 @@
         .card.selected { border: 3px solid var(--cyan-neon); transform: translateY(-10px) !important; background-color: #fffae6 !important; box-shadow: 0 0 15px var(--cyan-neon); z-index: 50 !important; }
         .card.hearts, .card.diamonds { color: #ff0055 !important; } 
         .card.clubs, .card.spades { color: #1a1c2e !important; } 
-        /* IDENTIDAD DEL JOKER SIEMPRE VISIBLE */
         .card.joker { color: #9c27b0 !important; background: linear-gradient(135deg, #f3e5f5, #e1bee7) !important; border: 2px solid #9c27b0; }
 
-        /* ANIMACIÓN DE DESCARTE */
+        /* ANIMACIÓN AL DESCARTAR */
         @keyframes discardAnim {
             0% { transform: scale(1.1) translateY(-10px); opacity: 1; }
             100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; }
@@ -137,6 +136,8 @@
             .status-bar button { padding: 4px 8px; font-size: 10px;}
             .avatar-icon { width: 35px; height: 35px; font-size: 18px;}
             .hand-container { min-height: 70px; gap: 3px;}
+            
+            /* CHAT ELEVADO COMPLETAMENTE */
             #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatMessages { max-height: 100px; }
@@ -145,7 +146,6 @@
 </head>
 <body>
 
-    <!-- LOGIN -->
     <div class="container" id="authScreen">
         <h1 class="western-title">🤠 GOLPE ONLINE 🃏</h1>
         <input type="text" id="authUsername" placeholder="Nickname">
@@ -161,7 +161,6 @@
         <p id="authError" style="color:var(--magenta-neon); font-size:12px; font-weight:bold;"></p>
     </div>
 
-    <!-- LOBBY -->
     <div class="container hidden" id="lobby">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
             <div style="text-align:left;">
@@ -185,7 +184,6 @@
         </div>
     </div>
 
-    <!-- SALA DE ESPERA -->
     <div class="container hidden" id="waitingRoom">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <button onclick="leaveRoom()" style="border-color:#e74c3c; color:#e74c3c; width:auto;">⬅️ Salir al Lobby</button>
@@ -214,7 +212,6 @@
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:10px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
     </div>
 
-    <!-- MESA DE JUEGO -->
     <div class="board hidden" id="gameBoard">
         <div class="poker-table-wrapper">
             <div class="next-turn-display">Próximo Turno:<br><strong id="nextTurnDisplay" style="color:var(--cyan-neon);">...</strong></div>
@@ -375,11 +372,12 @@
             if(target) socket.emit('vote_kick_player', { roomId: currentRoomId, targetName: target });
         }
 
+        // ANIMACIÓN DE DESCARTE ACTIVADA
         function actionDiscardOrKnock() {
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
                 const cardId = selectedCards[0];
                 const cardEl = document.getElementById(cardId);
-                if (cardEl) cardEl.classList.add('card-discarding'); // ANIMACIÓN DESCARTE
+                if(cardEl) cardEl.classList.add('card-discarding'); 
                 
                 setTimeout(() => {
                     socket.emit('discard', { roomId: currentRoomId, cardId: cardId }); 
@@ -494,8 +492,7 @@
         socket.on('show_taunt', ({ playerId, card }) => {
             let avatarDiv = document.getElementById(`avatar-${playerId}`); if (!avatarDiv && playerId === socket.id && !soyEspectador) avatarDiv = document.getElementById('localAvatarArea'); if (!avatarDiv) return;
             
-            let sClass = card.id.includes('Joker') ? 'joker' : card.suit;
-            const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + sClass;
+            const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + (card.id.includes('Joker')?'joker':card.suit);
             popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; 
             avatarDiv.appendChild(popup); playSound('taunt');
             
@@ -509,8 +506,7 @@
             const diffX = tableCX - avatarCX;
             const diffY = tableCY - avatarCY;
             
-            const moveX = diffX * 0.45; 
-            const moveY = diffY * 0.45; 
+            const moveX = diffX * 0.45; const moveY = diffY * 0.45; 
 
             popup.animate([ 
                 { opacity: 0, transform: `translate(0px, 0px) scale(0.2)` }, 
@@ -556,7 +552,6 @@
                 histList.innerHTML = activeRoomHistory.map((h, i) => `
                     <div style="background:rgba(0,0,0,0.4); padding:8px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                         <div>Ganador: <strong>${h.winner}</strong> (${h.score} pts)</div>
-                        <button onclick="openHistoryDetails(${i})" style="width:auto; padding:3px 8px; font-size:11px; margin:0;">🔍 Ver Mano de Todos</button>
                     </div>`).join('');
             }
 
@@ -567,9 +562,7 @@
             myHandData = hand; document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('gameBoard').classList.remove('hidden');
             const container = document.getElementById('myHand'); container.innerHTML = '';
             hand.forEach(c => {
-                // VISIBILIDAD DEL JOKER: Si su ID incluye 'Joker', mantiene la clase CSS joker
-                const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
-                const cardDiv = document.createElement('div');
+                const sClass = c.id.includes('Joker') ? 'joker' : c.suit; const cardDiv = document.createElement('div');
                 cardDiv.className = `card ${sClass}`; cardDiv.id = c.id; cardDiv.onclick = () => handleCardClick(c.id);
                 cardDiv.innerHTML = `<div>${c.rank}</div><div>${suitIcons[c.suit] || '🃏'}</div><div></div>`; container.appendChild(cardDiv);
                 makeCardDraggable(cardDiv);
@@ -647,6 +640,7 @@
                 });
             } else { exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>'; }
 
+            // ORDEN VISUAL EN EL MODAL DE VICTORIA
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
                 let handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
