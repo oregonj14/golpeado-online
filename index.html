@@ -121,6 +121,20 @@
         .joker-suit-btn { background: #fff; padding: 4px 12px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; font-size: 18px; width: auto; margin:0;}
         .joker-suit-btn.selected { border-color: var(--magenta-neon); }
 
+        /* EFECTOS VISUALES PARA ENCHUFES EN RESULTADOS */
+        .card-plugged {
+            transform: scale(0.8) translateY(-10px) !important;
+            box-shadow: 0 0 20px #00ff00, inset 0 0 10px #00ff00 !important;
+            border: 3px solid #00ff00 !important;
+            z-index: 5;
+        }
+        .card-plugged::after {
+            content: "Enchufe";
+            position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
+            background: #00ff00; color: black; font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; text-shadow: none;
+        }
+        .card-dead { opacity: 0.45 !important; transform: scale(0.7) !important; }
+
         @media (max-width: 480px) {
             :root { --card-w: 12vw; --card-h: 18vw; }
             .poker-table { max-height: 38vh; border-width: 8px;}
@@ -211,7 +225,6 @@
             <button id="joinFromSpecBtn" class="hidden" onclick="joinAsPlayer()" style="margin-top:8px; background:linear-gradient(#3498db, #2980b9); border-color:#fff; width:auto; padding:6px 12px; font-size:12px;">Unirse a la partida</button>
         </div>
 
-        <!-- EL BOTÓN ESTÁ AQUÍ Y SE MOSTRARÁ CUANDO TODOS ESTÉN LISTOS -->
         <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:15px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
     </div>
 
@@ -260,7 +273,6 @@
         <button onclick="document.getElementById('historyDetailsModal').classList.add('hidden')" style="margin-top:10px; width:100%; flex: 0 0 auto;">Cerrar Ventana</button>
     </div>
 
-    <!-- MODAL DE VICTORIA CON SCROLL -->
     <div class="container hidden" id="victoryModal" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9999; width:95%; max-width:550px; max-height: 85dvh; display: flex; flex-direction: column; padding: 15px; margin: 0; box-sizing: border-box; overflow: hidden;">
         <div style="flex: 0 0 auto;">
             <h2 style="color:var(--magenta-neon); margin:0; font-size:1.4rem;">💥 ¡ALGUIEN GOLPEÓ! 💥</h2>
@@ -497,7 +509,6 @@
                 let cardsHtml = p.hand.map(c => {
                     let sClass = c.id.includes('Joker') ? 'joker' : c.suit;
                     
-                    // EFECTO VISUAL PARA IDENTIFICAR ENCHUFES O CARTAS MUERTAS EN EL HISTORIAL
                     let transformStr = c.role === 'plug' ? 'scale(0.85) translateY(-5px)' : 'scale(0.85)';
                     let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 10px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
                     let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
@@ -607,7 +618,6 @@
                 document.getElementById('readyBtn').classList.remove('hidden');
             }
 
-            // MUESTRA EL BOTÓN REPARTIR SI TODOS LOS JUGADORES (HUMANOS Y BOTS) ESTÁN LISTOS
             if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
         });
 
@@ -703,16 +713,17 @@
                     handHtml = s.finalHand.map(c => { 
                         const sClass = c.id.includes('Joker') ? 'joker' : c.suit; 
                         
-                        // EFECTO VISUAL DE ENCHUFE (PLUG) Y CARTAS MUERTAS (DEAD) EN LA TABLA FINAL
-                        let transformStr = c.role === 'plug' ? 'scale(0.75) translateY(-8px)' : 'scale(0.7)';
-                        let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 15px #2ecc71; border: 2px solid #2ecc71; z-index: 5;' : '';
+                        // EFECTO VISUAL DE ENCHUFE APLICADO AQUÍ (Verde Neón Brillante)
+                        let transformStr = c.role === 'plug' ? 'scale(0.8) translateY(-8px)' : 'scale(0.7)';
+                        let borderStr = c.role === 'plug' ? 'box-shadow: 0 0 15px #00ff00, inset 0 0 5px #00ff00; border: 2px solid #00ff00; z-index: 5;' : '';
                         let opacityStr = c.role === 'dead' ? 'opacity: 0.55;' : '';
-                        let marginStr = c.role === 'plug' ? 'margin-right: -8px;' : 'margin-right: -12px;';
+                        let marginStr = c.role === 'plug' ? 'margin-right: -5px;' : 'margin-right: -12px;';
+                        let plugLabel = c.role === 'plug' ? `<div style="position:absolute; bottom:-12px; left:50%; transform:translateX(-50%); background:#00ff00; color:black; font-size:8px; padding:1px 3px; border-radius:2px; font-weight:bold; white-space:nowrap; text-shadow:none;">ENCHUFE</div>` : '';
 
-                        return `<span class="card ${sClass}" style="display:inline-flex; transform:${transformStr}; ${marginStr}; pointer-events:none; font-size:10px; ${borderStr} ${opacityStr}"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; 
+                        return `<span class="card ${sClass}" style="position:relative; display:inline-flex; transform:${transformStr}; ${marginStr}; pointer-events:none; font-size:10px; ${borderStr} ${opacityStr}"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div>${plugLabel}</span>`; 
                     }).join('');
                 }
-                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px; margin-top:5px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold; vertical-align:middle;">${s.score} pts</td></tr>`;
+                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:10px 5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px; margin-top:5px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold; vertical-align:middle;">${s.score} pts</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
         });
