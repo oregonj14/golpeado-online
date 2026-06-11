@@ -193,7 +193,6 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     return { score: bestScore, orderedHand: bestArrangement }; 
 };
 
-// AUTO-DISFRAZ DE JOKERS
 const inferJokers = (group) => {
     let jokers = group.filter(c => c.id.includes('Joker') && c.rank === 'Joker');
     let normals = group.filter(c => !(c.id.includes('Joker') && c.rank === 'Joker'));
@@ -263,7 +262,7 @@ const startTurnTimer = (roomId) => {
 const executeBotPlay = (roomId, bot) => {
     const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
     
-    // REGLA: GOLPEAR ANTES DE ROBAR
+    // 1. REGLA ESTRICTA: Golpear ANTES de robar
     if (bot.hand.length <= 7) {
         let optStart = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
         let hasExposed = room.exposedGroups.some(g => g.ownerName === bot.name);
@@ -279,7 +278,7 @@ const executeBotPlay = (roomId, bot) => {
         let tookDiscard = false;
         let topDiscard = room.discardPile[room.discardPile.length - 1];
         
-        // REGLA: El bot SOLO muestra grupo nuevo si roba del pozo
+        // 2. ROBAR DEL POZO (Única forma de mostrar grupo)
         if (topDiscard && bot.difficulty >= 3) {
             let handSubsets = getSubsetsBySize(bot.hand, [2, 3]);
             for (let sub of handSubsets) {
@@ -304,7 +303,7 @@ const executeBotPlay = (roomId, bot) => {
         io.to(roomId).emit('update_game', sanitizeRoom(room));
 
         setTimeout(() => {
-            // INTELIGENCIA DE MESA: Enchufar cartas sueltas en grupos existentes (Lvl 4+)
+            // 3. INTELIGENCIA: Enchufar cartas sueltas en la mesa (Lvl 4+) SIN crear grupos nuevos
             if (bot.difficulty >= 4) {
                 let madeChange = true;
                 while(madeChange) {
@@ -323,6 +322,7 @@ const executeBotPlay = (roomId, bot) => {
                 }
             }
 
+            // 4. DESCARTE INTELIGENTE
             let finalOpt = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
             let cardToDiscard;
             
@@ -374,7 +374,6 @@ const forceGameOver = async (roomId, knockerId) => {
     const scores = room.players.map(p => {
         let opt = getOptimalFinalScoreAndHand(p.hand, room.exposedGroups);
         let finalScore = p.surrendered ? opt.score + 20 : opt.score;
-        // Se añade explícitamente el estado surrendered para la tabla
         return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0, surrendered: p.surrendered };
     });
 
@@ -433,7 +432,6 @@ const handleLeaveRoom = (socket, roomId, forceRemove = false) => {
     return changed;
 };
 
-// --- SOCKETS ---
 io.on('connection', (socket) => {
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
 
@@ -444,7 +442,6 @@ io.on('connection', (socket) => {
         if (existingPlayer) {
             existingPlayer.id = socket.id; existingPlayer.offline = false;
             socket.join(roomId); socket.emit('room_joined', { roomId }); 
-            io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `✅ ${name} se reconectó.`, character: '🔌' });
             if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
             return io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
@@ -475,7 +472,8 @@ io.on('connection', (socket) => {
 
     socket.on('create_room', ({ name, activeEffect }) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-        rooms[roomId] = { id: roomId, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '', isBot: false }], spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [], maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, turnTimer: null, timerExpires: 0 };
+        // Contador de bots interno añadido
+        rooms[roomId] = { id: roomId, botCounter: 0, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '', isBot: false }], spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [], maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, turnTimer: null, timerExpires: 0 };
         socket.join(roomId); socket.emit('room_joined', { roomId }); io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId])); broadcastPublicRooms();
     });
 
@@ -483,9 +481,8 @@ io.on('connection', (socket) => {
         const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id) return;
         if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Mesa llena.');
         
-        // NOMBRADO CORRECTO Y DINÁMICO DE BOTS
-        let botCount = room.players.filter(p => p.isBot).length + 1;
-        let botName = `Bot ${botCount} (Lvl ${level})`;
+        room.botCounter++;
+        let botName = `Bot ${room.botCounter} (Lvl ${level})`;
         
         let colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6']; let color = colors[parseInt(level) - 1] || '#fff';
         room.players.push({ id: 'bot_'+Math.random().toString(36).substring(7), isBot: true, difficulty: parseInt(level), name: botName, character: '👾', ready: true, surrendered: false, hand: [], offline: false, inLobby: true, activeEffect: `color: ${color}; text-shadow: 0 0 5px ${color};` });
@@ -665,12 +662,6 @@ io.on('connection', (socket) => {
         const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
         const card = player.hand.find(c => c.id === cardId);
         if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
-    });
-
-    socket.on('vote_kick_player', ({ roomId, targetName }) => {
-        const room = rooms[roomId]; let host = getRealHost(room); if(!room || !host || host.id !== socket.id) return socket.emit('error_msg', 'Solo el creador puede expulsar.');
-        handleLeaveRoom({ id: 'dummy' }, roomId, true); 
-        io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Expulsión en mantenimiento.`, character: '🚨' });
     });
 
     socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId, true)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
