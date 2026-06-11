@@ -121,10 +121,8 @@
         .joker-suit-btn { background: #fff; padding: 4px 12px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; font-size: 18px; width: auto; margin:0;}
         .joker-suit-btn.selected { border-color: var(--magenta-neon); }
 
-        /* OPTIMIZACIÓN EXTREMA PARA CELULARES */
         @media (max-width: 480px) {
             :root { --card-w: 12vw; --card-h: 18vw; }
-            /* Se hace la mesa un poco más baja y ancha para dar espacio */
             .poker-table { max-height: 40vh; border-width: 5px; width: 96%; padding: 5px;}
             .card-back::after { font-size: 20px; }
             .status-bar button { padding: 4px 8px; font-size: 10px;}
@@ -565,8 +563,14 @@
             
             if (soyHost) {
                 document.getElementById('hostSettingsArea').classList.remove('hidden'); document.getElementById('setTurnTime').value = room.turnTime || "30"; document.getElementById('setPlayers').value = room.maxPlayers || "5"; document.getElementById('setJokers').value = room.jokerCount || "2";
-                const selectStarter = document.getElementById('setStarter'); selectStarter.innerHTML = '';
+                
+                const selectStarter = document.getElementById('setStarter'); 
+                selectStarter.innerHTML = '';
                 room.players.forEach(p => { selectStarter.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+                
+                // AQUÍ ESTÁ LA CORRECCIÓN: Fija el valor visual seleccionado para que no se reinicie
+                if (room.startingPlayerId) { selectStarter.value = room.startingPlayerId; }
+
             } else {
                 document.getElementById('hostSettingsArea').classList.add('hidden');
             }
@@ -649,12 +653,11 @@
             el.addEventListener('touchend', () => { if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; } const newOrder = [...document.getElementById('myHand').children].map(c => c.id); socket.emit('reorder_hand', { roomId: currentRoomId, newOrder }); });
         }
 
-        // COORDENADAS REAJUSTADAS PARA EVITAR CHOQUES CON LA MESA
         function getSeatPosition(index, totalOthers) {
-            if (totalOthers === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
-            if (totalOthers === 2) { if (index === 0) return { top: '15%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '10%' }; }
-            if (totalOthers === 3) { if (index === 0) return { top: '35%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '35%', left: '5%' }; }
-            if (totalOthers >= 4) { if (index === 0) return { top: '45%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '10%', left: '80%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '10%', left: '20%' }; if (index === 3) return { top: '45%', left: '5%' }; }
+            if (totalOthers === 1) return { top: '10%', left: '50%', transform: 'translateX(-50%)' };
+            if (totalOthers === 2) { if (index === 0) return { top: '25%', left: '85%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '25%', left: '15%' }; }
+            if (totalOthers === 3) { if (index === 0) return { top: '40%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '40%', left: '10%' }; }
+            if (totalOthers >= 4) { if (index === 0) return { top: '50%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '75%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '15%', left: '25%' }; if (index === 3) return { top: '50%', left: '10%' }; }
             return { top: '0', left: '0' };
         }
 
@@ -706,7 +709,6 @@
             scores.forEach(s => {
                 let handHtml = '';
                 if(s.finalHand.length === 0) {
-                    // CORRECCIÓN DEL MENSAJE DE RETIRO
                     if (s.surrendered) {
                         handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
                     } else {
