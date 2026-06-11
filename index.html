@@ -67,11 +67,7 @@
         .card.clubs, .card.spades { color: #1a1c2e !important; } 
         .card.joker { color: #9c27b0 !important; background: linear-gradient(135deg, #f3e5f5, #e1bee7) !important; border: 2px solid #9c27b0; }
 
-        /* ANIMACIÓN AL DESCARTAR */
-        @keyframes discardAnim {
-            0% { transform: scale(1.1) translateY(-10px); opacity: 1; }
-            100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; }
-        }
+        @keyframes discardAnim { 0% { transform: scale(1.1) translateY(-10px); opacity: 1; } 100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; } }
         .card-discarding { animation: discardAnim 0.3s forwards ease-in; z-index: 999 !important; pointer-events: none; }
 
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-height: 12vh; overflow-y: auto;}
@@ -82,11 +78,7 @@
         .avatar-icon { font-size: 26px; background: #16152b; border: 2px solid var(--cyan-neon); border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; transition: 0.3s;}
         .avatar-name { background: rgba(6,6,12,0.9); padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-top: -6px; white-space: nowrap;}
         
-        @keyframes pulseActiveTurn { 
-            0% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); }
-            50% { box-shadow: 0 0 30px var(--magenta-neon), 0 0 15px white; border-color: white; transform: scale(1.15); }
-            100% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); }
-        }
+        @keyframes pulseActiveTurn { 0% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); } 50% { box-shadow: 0 0 30px var(--magenta-neon), 0 0 15px white; border-color: white; transform: scale(1.15); } 100% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); } }
         .avatar-seat.active-turn .avatar-icon { animation: pulseActiveTurn 1.2s infinite; z-index: 15;}
 
         .next-turn-display { position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,0.7); border: 1px solid var(--cyan-neon); padding: 5px 10px; border-radius: 8px; font-size: 11px; z-index: 10; text-align: center;}
@@ -136,8 +128,6 @@
             .status-bar button { padding: 4px 8px; font-size: 10px;}
             .avatar-icon { width: 35px; height: 35px; font-size: 18px;}
             .hand-container { min-height: 70px; gap: 3px;}
-            
-            /* CHAT ELEVADO COMPLETAMENTE */
             #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
             #chatBox.minimized { width: 45px; height: 45px; }
             #chatMessages { max-height: 100px; }
@@ -197,6 +187,16 @@
                 <div class="setting-item"> <label>🃏 Jokers</label> <select id="setJokers" onchange="sendSettings()"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select> </div>
                 <div class="setting-item"> <label>⏱️ Tiempo de Turno</label> <select id="setTurnTime" onchange="sendSettings()"><option value="15">15s</option><option value="30" selected>30s</option><option value="45">45s</option><option value="60">60s</option></select> </div>
                 <div class="setting-item"> <label>🎲 Empieza</label> <select id="setStarter" onchange="sendSettings()"></select> </div>
+                
+                <!-- BOTÓN PARA AGREGAR BOTS -->
+                <div class="setting-item" style="grid-column: span 2;">
+                    <label>🤖 Añadir Bot</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="botLevel"><option value="1">Lvl 1 (Básico)</option><option value="3" selected>Lvl 3 (Normal)</option><option value="5">Lvl 5 (Pro)</option></select>
+                        <button onclick="addBot()" style="padding: 6px;">Añadir</button>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -305,7 +305,7 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000, timeout: 20000 });
+        const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000, timeout: 60000 });
         
         let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, soyEspectador = false;
         let selectedCards = [], myHandData = [], activeRoomHistory = [];
@@ -360,6 +360,12 @@
             socket.emit('change_settings', { roomId: currentRoomId, maxPlayers: document.getElementById('setPlayers').value, jokerCount: document.getElementById('setJokers').value, startingPlayerId: document.getElementById('setStarter').value, turnTime: document.getElementById('setTurnTime').value });
         }
 
+        function addBot() {
+            if(!soyHost) return;
+            const level = document.getElementById('botLevel').value;
+            socket.emit('add_bot', { roomId: currentRoomId, level: level });
+        }
+
         function pickCharacter(char) { socket.emit('select_character', { roomId: currentRoomId, character: char }); }
         function toggleReady() { socket.emit('toggle_ready', currentRoomId); }
         function startGame() { socket.emit('start_game', currentRoomId); }
@@ -372,7 +378,6 @@
             if(target) socket.emit('vote_kick_player', { roomId: currentRoomId, targetName: target });
         }
 
-        // ANIMACIÓN DE DESCARTE ACTIVADA
         function actionDiscardOrKnock() {
             if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
                 const cardId = selectedCards[0];
@@ -544,7 +549,8 @@
             const list = document.getElementById('playerList'); list.innerHTML = ''; let readyCount = 0;
             room.players.forEach(p => {
                 if(p.id===socket.id) miPersonaje = p.character; if (p.ready && p.inLobby) readyCount++;
-                list.innerHTML += `<div class="player-list-item"><span class="${p.activeEffect}">${p.character || '❓'} ${p.name}</span><div>${p.ready?'✅ LISTO':'⏳ PENSANDO'}</div></div>`;
+                let statusBadge = p.offline ? '📡 DESCONECTADO' : (p.ready ? '✅ LISTO' : '⏳ PENSANDO');
+                list.innerHTML += `<div class="player-list-item"><span class="${p.activeEffect}" style="${p.activeEffect}">${p.character || '❓'} ${p.name}</span><div>${statusBadge}</div></div>`;
             });
 
             const histList = document.getElementById('roomHistoryList');
@@ -609,7 +615,8 @@
 
             orderedOpponents.forEach((p, index) => {
                 const pos = getSeatPosition(index, orderedOpponents.length); const isTurn = room.turnId === p.id;
-                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon">${p.character || '❓'}</div><div class="avatar-name ${p.activeEffect}">${p.name}</div></div>`;
+                let avatarSymbol = p.offline ? '📡' : (p.character || '❓');
+                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon" style="${p.activeEffect}">${avatarSymbol}</div><div class="avatar-name" style="${p.activeEffect}">${p.name}</div></div>`;
             });
 
             miTurno = (room.turnId === socket.id);
@@ -640,10 +647,14 @@
                 });
             } else { exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>'; }
 
-            // ORDEN VISUAL EN EL MODAL DE VICTORIA
             const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
             scores.forEach(s => {
-                let handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
+                let handHtml = '';
+                if(s.finalHand.length === 0) {
+                    handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
+                } else {
+                    handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
+                }
                 tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
             });
             document.getElementById('victoryModal').classList.remove('hidden');
