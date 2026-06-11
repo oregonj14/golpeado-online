@@ -1,692 +1,610 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GOLPE ONLINE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rye&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-dark: #06060c;
-            --cyan-neon: #00f2ff;
-            --magenta-neon: #ff00ff;
-            --glass: rgba(15, 12, 28, 0.85);
-            --border-glass: rgba(0, 242, 255, 0.15);
-            --card-w: 55px;
-            --card-h: 80px;
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const app = express();
+const server = http.createServer(app);
+
+// CONFIGURACIÓN ANTI-DESCONEXIONES BLINDADA
+const io = new Server(server, {
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
+
+app.use(express.json());
+app.get('/', (req, res) => { res.sendFile(__dirname + '/index.html'); });
+app.use(express.static(__dirname));
+
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/saloon_golpeado';
+mongoose.connect(MONGO_URI).catch(err => console.error(err));
+
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    victories: { type: Number, default: 0 },
+    points: { type: Number, default: 0 },
+    unlockedChars: { type: [String], default: ['🤠', '🤖', '💀', '🦊', '🦁'] },
+    activeEffect: { type: String, default: '' },
+    unlockedEffects: { type: [String], default: [] }
+});
+const User = mongoose.model('User', UserSchema);
+
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (await User.findOne({ username })) return res.status(400).json({ error: 'Nickname en uso' });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+        res.status(201).json({ message: 'Cuenta creada' });
+    } catch (e) { res.status(500).json({ error: 'Error BD.' }); }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user || !(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: 'Credenciales inválidas' });
+        
+        let changed = false;
+        ['🤠', '🤖', '💀', '🦊', '🦁'].forEach(c => { if (!user.unlockedChars.includes(c)) { user.unlockedChars.push(c); changed = true; } });
+        if (changed) await user.save(); 
+
+        res.status(200).json({ user });
+    } catch (e) { res.status(500).json({ error: 'Error BD.' }); }
+});
+
+app.get('/api/ranking', async (req, res) => {
+    try {
+        const allUsers = await User.find({}, 'username victories').sort({ victories: -1 }).limit(100);
+        res.status(200).json(allUsers);
+    } catch (e) { res.status(500).json({ error: 'Error Ranking' }); }
+});
+
+app.post('/api/buy', async (req, res) => {
+    try {
+        const { username, item, price, type } = req.body;
+        const user = await User.findOne({ username });
+        if (!user || user.points < price) return res.status(400).json({ error: 'Fichas insuficientes' });
+        if (type === 'char' && user.unlockedChars.includes(item)) return res.status(400).json({ error: 'Ya lo tienes' });
+        if (type === 'effect' && user.unlockedEffects.includes(item)) return res.status(400).json({ error: 'Ya lo tienes' });
+
+        user.points -= price;
+        if (type === 'char') { user.unlockedChars.push(item); } else { user.unlockedEffects.push(item); user.activeEffect = item; }
+        await user.save();
+        res.status(200).json({ points: user.points, unlockedChars: user.unlockedChars, activeEffect: user.activeEffect, message: 'Comprado!' });
+    } catch (e) { res.status(500).json({ error: 'Error Transacción' }); }
+});
+
+const rooms = {};
+const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+const broadcastPublicRooms = () => { io.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state }))); };
+
+const getCardValue = (rank) => {
+    if (['A', '10', 'J', 'Q', 'K'].includes(rank)) return 10;
+    if (rank === 'Joker') return 0;
+    return parseInt(rank);
+};
+
+const createDeck = (jokerCount) => {
+    let deck = [];
+    suits.forEach(suit => { ranks.forEach(rank => { deck.push({ suit, rank, value: getCardValue(rank), id: `${rank}_${suit}` }); }); });
+    for (let i = 1; i <= jokerCount; i++) { deck.push({ suit: 'none', rank: 'Joker', value: 0, id: `Joker_${i}_${Date.now()}` }); }
+    return deck.sort(() => Math.random() - 0.5);
+};
+
+// MOTOR MATEMÁTICO
+const isValidMelding = (cards) => {
+    if (cards.length < 3 || cards.length > 4) return false;
+    let jokers = cards.filter(c => c.id.includes('Joker')).length;
+    let normals = cards.filter(c => !c.id.includes('Joker'));
+    if (normals.length <= 1) return true;
+
+    if (normals.every(c => c.rank === normals[0].rank)) {
+        let uniqueSuits = new Set(normals.map(c => c.suit)).size;
+        if (uniqueSuits === normals.length) return true; 
+    }
+
+    if (normals.every(c => c.suit === normals[0].suit)) {
+        const checkSeq = (vals) => {
+            let sorted = [...vals].sort((a, b) => a - b);
+            if (new Set(sorted).size !== sorted.length) return false; 
+            let gaps = 0;
+            for (let i = 0; i < sorted.length - 1; i++) gaps += (sorted[i+1] - sorted[i] - 1);
+            return gaps <= jokers; 
+        };
+
+        let valLow = normals.map(c => { if (c.rank === 'A') return 1; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank==='J'?11 : c.rank==='Q'?12 : 13; return parseInt(c.rank); });
+        if (checkSeq(valLow)) return true;
+
+        let valHigh = normals.map(c => { if (c.rank === 'A') return 14; if (c.rank === '2') return 15; if (['J', 'Q', 'K'].includes(c.rank)) return c.rank==='J'?11 : c.rank==='Q'?12 : 13; return parseInt(c.rank); });
+        if (checkSeq(valHigh)) return true;
+    }
+    return false;
+};
+
+const getSubsets = (array) => {
+    let subsets = [];
+    const generate = (current, start) => {
+        if (current.length === 3 || current.length === 4) subsets.push([...current]);
+        if (current.length === 4) return;
+        for (let i = start; i < array.length; i++) { current.push(array[i]); generate(current, i + 1); current.pop(); }
+    };
+    generate([], 0); return subsets;
+};
+
+const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
+    let bestScore = Infinity;
+    let bestArrangement = [];
+
+    function evaluate(currentHand, currentTableGroups, currentFormedGroups) {
+        let score = currentHand.reduce((acc, c) => acc + (c.id.includes('Joker') ? 0 : c.value), 0);
+        if (score < bestScore) { 
+            bestScore = score; 
+            let sortedLeftovers = [...currentHand].sort((a, b) => b.value - a.value);
+            bestArrangement = [];
+            currentFormedGroups.forEach(g => { bestArrangement.push(...g); });
+            bestArrangement.push(...sortedLeftovers);
         }
 
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: radial-gradient(circle at center, #131124 0%, var(--bg-dark) 100%); color: white; text-align: center; margin: 0; padding: 0; height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-        .western-title { font-family: 'Rye', cursive; color: white; text-shadow: 0 0 8px var(--cyan-neon), 0 0 20px var(--cyan-neon); font-size: 2.2rem; margin: 10px 0;}
-        .container { max-width: 600px; margin: 2vh auto; background: var(--glass); backdrop-filter: blur(15px); padding: 20px; border-radius: 20px; border: 1px solid var(--border-glass); box-shadow: 0 8px 32px rgba(0,0,0,0.7); width: 90%; max-height: 95vh; overflow-y: auto; }
-        
-        input, select, button { padding: 10px; margin: 6px 0; border: none; border-radius: 5px; font-size: 15px; font-weight: bold; }
-        input, select { width: 80%; background-color: #1a192e; color: #fff; border: 1px solid var(--border-glass); box-sizing: border-box; }
-        button { background: transparent; border: 1px solid var(--cyan-neon); color: var(--cyan-neon); cursor: pointer; width: 85%; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
-        button:hover { background: var(--cyan-neon); color: black; box-shadow: 0 0 20px var(--cyan-neon); }
-        .hidden { display: none !important; }
-        
-        .pwd-container { position: relative; width: 80%; margin: 6px auto; }
-        .pwd-container input { width: 100%; padding-right: 40px; box-sizing: border-box; margin: 0;}
-        .eye-icon { position: absolute; right: 10px; top: 10px; cursor: pointer; font-size: 16px; user-select: none; color: var(--cyan-neon); }
-        
-        .char-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
-        .char-btn { background: #16152b; border: 1px solid var(--border-glass); border-radius: 10px; padding: 5px; font-size: 24px; cursor: pointer; color:white; }
-        .char-btn.my-selection { border-color: var(--magenta-neon); background: rgba(255, 0, 255, 0.2); box-shadow: 0 0 15px var(--magenta-neon); }
-        
-        .glow-gold { text-shadow: 0 0 10px gold; color: gold !important; font-weight: bold;}
-        .glow-neon { text-shadow: 0 0 10px var(--cyan-neon); color: var(--cyan-neon) !important; font-weight: bold;}
-
-        .room-item { background: #111021; border: 1px solid var(--border-glass); border-radius: 5px; padding: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;}
-        .room-item button { width: auto; margin: 0; padding: 5px 15px; }
-        .player-list-item { background: rgba(0,0,0,0.5); border-left: 4px solid var(--cyan-neon); margin-bottom: 5px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;}
-        .settings-panel { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid var(--border-glass); }
-        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
-        .setting-item { display: flex; flex-direction: column; text-align: left;}
-        .setting-item label { font-size: 11px; color: #ecf0f1; margin-bottom: 4px; font-weight: bold;}
-
-        .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; width: 100%; height: 100%; box-sizing: border-box; }
-        .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; z-index: 1; padding: 10px; box-sizing: border-box;}
-        
-        .poker-table { width: 90%; max-width: 700px; height: 100%; max-height: 45vh; background: radial-gradient(circle, #171533 0%, var(--bg-dark) 100%); border: 12px solid #16152b; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 2; box-shadow: 0 0 20px rgba(0,242,255,0.1); }
-        
-        .mat { display: flex; justify-content: center; gap: 15px; }
-        
-        .card, .deck-slot, .card-back { width: var(--card-w); height: var(--card-h); border-radius: 6px; box-sizing: border-box; }
-        
-        .card-back { background: repeating-linear-gradient(45deg, #2c160b, #2c160b 8px, #5c3a21 8px, #5c3a21 16px); border: 2px solid #f1c40f; box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 8px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; }
-        .card-back::after { content: "🃏"; font-size: 22px; background: rgba(0,0,0,0.6); border-radius: 50%; padding: 4px; box-shadow: 0 0 5px #f1c40f; }
-        .deck-slot { border: 2px dashed var(--magenta-neon); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--magenta-neon); font-size: 11px;}
-        
-        .card { background-color: #ffffff !important; color: #000000 !important; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: grab; position: relative; z-index: 10; transition: transform 0.1s ease; font-size: 13px;}
-        .card div:nth-child(2) { font-size: 1.6em; text-align: center; } 
-        
-        .card:hover, .card:active { z-index: 100 !important; cursor: grabbing; transform: scale(1.1) translateY(-10px); }
-        .card.selected { border: 3px solid var(--cyan-neon); transform: translateY(-10px) !important; background-color: #fffae6 !important; box-shadow: 0 0 15px var(--cyan-neon); z-index: 50 !important; }
-        .card.hearts, .card.diamonds { color: #ff0055 !important; } 
-        .card.clubs, .card.spades { color: #1a1c2e !important; } 
-        .card.joker { color: #9c27b0 !important; background: linear-gradient(135deg, #f3e5f5, #e1bee7) !important; border: 2px solid #9c27b0; }
-
-        @keyframes discardAnim { 0% { transform: scale(1.1) translateY(-10px); opacity: 1; } 100% { transform: scale(0.5) translateY(-200px) rotate(15deg); opacity: 0; } }
-        .card-discarding { animation: discardAnim 0.3s forwards ease-in; z-index: 999 !important; pointer-events: none; }
-
-        .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; max-height: 12vh; overflow-y: auto;}
-        .exposed-group { display: inline-flex; background: rgba(0,0,0,0.6); padding: 3px 5px; border-radius: 6px; border: 1px solid var(--magenta-neon); cursor: pointer; }
-        
-        .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 10; }
-        .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
-        .avatar-icon { font-size: 26px; background: #16152b; border: 2px solid var(--cyan-neon); border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; transition: 0.3s;}
-        .avatar-name { background: rgba(6,6,12,0.9); padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-top: -6px; white-space: nowrap;}
-        
-        @keyframes pulseActiveTurn { 0% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); } 50% { box-shadow: 0 0 30px var(--magenta-neon), 0 0 15px white; border-color: white; transform: scale(1.15); } 100% { box-shadow: 0 0 10px var(--magenta-neon); border-color: var(--magenta-neon); transform: scale(1); } }
-        .avatar-seat.active-turn .avatar-icon { animation: pulseActiveTurn 1.2s infinite; z-index: 15;}
-
-        .next-turn-display { position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,0.7); border: 1px solid var(--cyan-neon); padding: 5px 10px; border-radius: 8px; font-size: 11px; z-index: 10; text-align: center;}
-        
-        .taunt-popup { position: absolute; top: -20px; left: 50%; margin-left: -27px; z-index: 9999; pointer-events: none; }
-        
-        .bottom-panel { display: flex; flex-direction: column; align-items: center; width: 100%; background: linear-gradient(to top, var(--bg-dark) 85%, transparent); padding-bottom: max(5px, env(safe-area-inset-bottom)); flex-shrink: 0; z-index: 50; }
-        .status-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: 98%; max-width: 700px; margin-bottom: 5px; }
-        .status-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 15px; border: 1px solid var(--border-glass); }
-        .status-bar button { margin: 0; width: auto; padding: 6px 12px; font-size: 12px; }
-        
-        #localAvatarArea { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 15px; border: 2px solid var(--cyan-neon); position: relative;}
-        #localAvatarArea .avatar-icon { width: 35px; height: 35px; font-size: 18px; margin: 0; border: none; background: transparent; transition: 0.3s;}
-        #localAvatarArea.active-turn .avatar-icon { animation: pulseActiveTurn 1.2s infinite; }
-        #localAvatarArea .avatar-name { background: none; border: none; padding: 0; font-size: 12px; margin: 0; color: white; font-weight: bold; }
-        
-        .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 10px 5px; min-height: 90px; width: 95%; max-width: 800px; }
-
-        #chatBox { position: fixed; right: 15px; bottom: 15px; width: 260px; background: rgba(15, 12, 28, 0.95); border: 1px solid var(--border-glass); border-radius: 8px; z-index: 9999; display: flex; flex-direction: column; padding: 6px; }
-        .chat-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 5px; margin-bottom: 5px; border-bottom: 1px solid var(--border-glass); font-size: 12px; color: var(--cyan-neon); }
-        .chat-header h4 { margin: 0; }
-        #chatBox.minimized { width: 55px; height: 55px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; padding: 0; border: 2px solid var(--cyan-neon); }
-        #chatBox.minimized::before { content: "💬"; font-size: 24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; }
-        #chatBox.minimized * { display: none; }
-        #chatMessages { flex: 1; max-height: 120px; overflow-y: auto; font-size: 12px; text-align: left; margin-bottom: 5px; }
-        .chat-input-area { display: flex; gap: 5px; margin-bottom: 5px; }
-        .chat-input-area input { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border-glass); font-size: 12px; color: white; background: #111021; margin:0;}
-        .chat-input-area button { width: auto; padding: 6px 10px; margin: 0; font-size: 11px; }
-        .chat-emotes { display: flex; gap: 5px; justify-content: center; }
-        .emote-btn { background: #111021; border: 1px solid var(--border-glass); border-radius: 5px; padding: 4px; font-size: 16px; cursor: pointer; flex: 1; margin:0; color: white;}
-
-        #jokerModal {
-            background: rgba(10, 5, 20, 0.75) !important; backdrop-filter: blur(8px);
-            border: 2px solid var(--cyan-neon); padding: 15px; border-radius: 15px;
-            position: fixed; bottom: 20%; left: 50%; transform: translateX(-50%); width: 85%; max-width: 400px; z-index: 10000;
-        }
-        .joker-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
-        .joker-btn { background: transparent; border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 5px; color: white; cursor: pointer; font-weight: bold; width: auto; margin:0;}
-        .joker-btn.selected { background: var(--cyan-neon); color: black; border-color: var(--cyan-neon); }
-        .joker-suit-btn { background: #fff; padding: 4px 12px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; font-size: 18px; width: auto; margin:0;}
-        .joker-suit-btn.selected { border-color: var(--magenta-neon); }
-
-        @media (max-width: 480px) {
-            :root { --card-w: 12vw; --card-h: 18vw; }
-            .poker-table { max-height: 38vh; border-width: 8px;}
-            .card-back::after { font-size: 20px; }
-            .status-bar button { padding: 4px 8px; font-size: 10px;}
-            .avatar-icon { width: 35px; height: 35px; font-size: 18px;}
-            .hand-container { min-height: 70px; gap: 3px;}
-            #chatBox { top: 75px; bottom: auto !important; right: 10px; width: 220px; }
-            #chatBox.minimized { width: 45px; height: 45px; }
-            #chatMessages { max-height: 100px; }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- LOGIN -->
-    <div class="container" id="authScreen">
-        <h1 class="western-title">🤠 GOLPE ONLINE 🃏</h1>
-        <input type="text" id="authUsername" placeholder="Nickname">
-        <div class="pwd-container">
-            <input type="password" id="authPassword" placeholder="Contraseña">
-            <span class="eye-icon" onclick="togglePass()">👁️</span>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <button onclick="login()">Entrar</button>
-            <button onclick="register()">Crear Cuenta</button>
-        </div>
-        <button onclick="loginAsGuest()" style="margin-top:10px;">🕵️‍♂️ Jugar como Invitado</button>
-        <p id="authError" style="color:var(--magenta-neon); font-size:12px; font-weight:bold;"></p>
-    </div>
-
-    <!-- LOBBY -->
-    <div class="container hidden" id="lobby">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
-            <div style="text-align:left;">
-                <h3 id="profileName" style="margin:0;">Jugador</h3>
-                <span style="font-size:12px;">🏆 Victorias: <strong id="profileWins">0</strong> | 💰 Fichas: <strong id="profilePoints">0</strong></span>
-                <br><button onclick="logout()" style="width:auto; padding:3px 8px; font-size:11px; margin-top:5px;">⬅️ Salir</button>
-            </div>
-            <div>
-                <button onclick="openRanking()" style="width:auto; padding:5px 10px;">🏆 Ranking</button>
-                <button onclick="openStore()" style="width:auto; padding:5px 10px; border-color:var(--magenta-neon); color:var(--magenta-neon);">🛒 Tienda</button>
-            </div>
-        </div>
-        <button onclick="createRoom()" style="margin-top:15px;">Crear Mesa Privada</button>
-        <div style="display:flex; gap:5px; margin:10px 0;">
-            <input type="text" id="roomCode" placeholder="Código de la Mesa">
-            <button onclick="joinRoom()" style="width:auto;">Unirse</button>
-        </div>
-        <div class="room-list-container">
-            <h4 style="margin:0 0 5px 0; color:var(--cyan-neon);">🚪 Mesas Activas:</h4>
-            <div id="publicRoomsList">Buscando mesas...</div>
-        </div>
-    </div>
-
-    <!-- SALA DE ESPERA -->
-    <div class="container hidden" id="waitingRoom">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <button onclick="leaveRoom()" style="border-color:#e74c3c; color:#e74c3c; width:auto;">⬅️ Salir al Lobby</button>
-            <h2>Mesa: <span id="displayCode" style="color:var(--magenta-neon);">----</span></h2>
-        </div>
-        
-        <div id="hostSettingsArea" class="hidden settings-panel">
-            <h4 style="margin:0 0 10px 0; color:var(--cyan-neon);">⚙️ Opciones del Creador</h4>
-            <div class="settings-grid">
-                <div class="setting-item"> <label>👥 Máx Jugadores</label> <select id="setPlayers" onchange="sendSettings()"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select> </div>
-                <div class="setting-item"> <label>🃏 Jokers</label> <select id="setJokers" onchange="sendSettings()"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select> </div>
-                <div class="setting-item"> <label>⏱️ Tiempo de Turno</label> <select id="setTurnTime" onchange="sendSettings()"><option value="15">15s</option><option value="30" selected>30s</option><option value="45">45s</option><option value="60">60s</option></select> </div>
-                <div class="setting-item"> <label>🎲 Empieza</label> <select id="setStarter" onchange="sendSettings()"></select> </div>
-                
-                <div class="setting-item" style="grid-column: span 2;">
-                    <label>🤖 Añadir Bot</label>
-                    <div style="display:flex; gap:5px;">
-                        <select id="botLevel"><option value="1">Lvl 1 (Básico)</option><option value="3" selected>Lvl 3 (Normal)</option><option value="5">Lvl 5 (Pro)</option></select>
-                        <button onclick="addBot()" style="padding: 6px;">Añadir</button>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <div class="room-history-container" style="margin-top: 10px;">
-            <h4 id="charTitle">🎭 Elige tu personaje:</h4>
-            <div class="char-grid" id="charactersGrid"></div>
-            <div id="playerList"></div>
-            <button id="readyBtn" onclick="toggleReady()" style="margin-top:10px;">MARCAR LISTO</button>
-        </div>
-
-        <!-- ZONA DE ESPECTADORES EN EL LOBBY -->
-        <div class="room-history-container" style="margin-top: 10px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px;">
-            <h4 style="margin:0 0 8px 0; color:var(--cyan-neon);">👀 Espectadores</h4>
-            <div id="spectatorList" style="font-size:12px;">Ninguno.</div>
-            <button id="joinFromSpecBtn" class="hidden" onclick="joinAsPlayer()" style="margin-top:8px; background:linear-gradient(#3498db, #2980b9); border-color:#fff; width:auto; padding:6px 12px; font-size:12px;">Unirse a la partida</button>
-        </div>
-
-        <button id="startBtn" class="hidden" onclick="startGame()" style="margin-top:15px; border-color:var(--magenta-neon); color:var(--magenta-neon);">REPARTIR CARTAS 🚀</button>
-    </div>
-
-    <!-- MESA DE JUEGO -->
-    <div class="board hidden" id="gameBoard">
-        <div class="poker-table-wrapper">
-            <div class="next-turn-display">Próximo Turno:<br><strong id="nextTurnDisplay" style="color:var(--cyan-neon);">...</strong></div>
-            <div class="opponents-container" id="opponentsArea"></div>
-            <div class="poker-table">
-                <div class="mat">
-                    <div class="card-back" onclick="drawCard('deck')"><span id="deckCount" style="color:var(--cyan-neon); font-size:12px; position:absolute; bottom:2px;">0</span></div>
-                    <div id="discardSlot" onclick="drawCard('discard')"><div class="deck-slot">Vacío</div></div>
-                </div>
-                <div class="exposed-groups-container" id="exposedArea"></div>
-                <div style="position:absolute; bottom:5px; font-weight:bold;"><span id="turnIndicator">Esperando...</span> <span id="timerDisplay" style="color:var(--magenta-neon); display:none;">⏱️ 30s</span></div>
-            </div>
-        </div>
-        
-        <div class="bottom-panel" id="playerControlPanel">
-            <div class="status-container">
-                <div id="localAvatarArea"></div>
-                <div class="status-bar" id="gameplayButtons">
-                    <button onclick="voteKickActive()" style="border-color:#e74c3c; color:#e74c3c;">🚨 Expulsar</button>
-                    <button id="discardKnockBtn" onclick="actionDiscardOrKnock()">¡GOLPE!</button>
-                    <button onclick="surrenderHand()" style="color: #aaa; border-color: #555;">🪦 Retirar</button>
-                    <button onclick="tauntCard()" style="border-color:var(--magenta-neon); color:var(--magenta-neon);">🃏 Burlar</button>
-                </div>
-            </div>
-            <div class="hand-container" id="myHand"></div>
-        </div>
-    </div>
-
-    <!-- MODALES -->
-    <div class="container hidden" id="jokerModal">
-        <h3 style="color:var(--cyan-neon); margin:0 0 10px 0;">🃏 Configurar Joker</h3>
-        <p style="font-size:12px; margin-bottom:10px;">Selecciona Número y Palo:</p>
-        <div class="joker-row" id="jokerRanks"></div>
-        <div class="joker-row" id="jokerSuits"></div>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button onclick="confirmJoker()" style="flex:1;">Aplicar</button>
-            <button onclick="cancelJoker()" style="flex:1; border-color:#e74c3c; color:#e74c3c;">Cancelar</button>
-        </div>
-    </div>
-
-    <!-- MODAL DE VICTORIA CON SCROLL -->
-    <div class="container hidden" id="victoryModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:9999; width:90%; max-width:550px; max-height: 90vh; display: flex; flex-direction: column;">
-        <h2 style="color:var(--magenta-neon); margin:0; flex-shrink: 0;">💥 ¡ALGUIEN GOLPEÓ LA MESA! 💥</h2>
-        <p id="knockerName" style="flex-shrink: 0;"></p>
-        <h3 id="victoryAlert" style="color:var(--cyan-neon); margin:5px 0; flex-shrink: 0;"></h3>
-        
-        <div style="overflow-y: auto; padding-right: 5px; margin-bottom: 10px; flex: 1;">
-            <h4 style="margin: 5px 0; color:#fff; font-size:12px;">Juegos en la Mesa:</h4>
-            <div id="modalExposedGroups" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:10px; background:rgba(0,0,0,0.5); padding:5px; border-radius:8px;"></div>
-            <table style="width:100%; margin-bottom:0;" id="modalScoreBody"></table>
-        </div>
-
-        <div style="display:flex; gap:10px; flex-shrink: 0;">
-            <button onclick="returnToIndividualLobby()">Volver a la Sala</button>
-            <button onclick="leaveRoom()" style="border-color:#c0392b; color:#c0392b;">Salir de la Mesa</button>
-        </div>
-    </div>
-
-    <div class="container hidden" id="rankingModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:999;">
-        <h2>🏆 Top Global</h2><div id="rankingList"></div>
-        <button onclick="document.getElementById('rankingModal').classList.add('hidden')" style="margin-top:10px;">Cerrar</button>
-    </div>
-
-    <div class="container hidden" id="storeModal" style="position:fixed; top:5vh; left:50%; transform:translateX(-50%); z-index:999;">
-        <h2>🛒 Tienda (Fichas: <span id="storeMyPoints">0</span>)</h2>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <button onclick="buyItem('char', '🐍', 150)">🐍 Serpiente (150)</button>
-            <button onclick="buyItem('char', '🐺', 200)">🐺 Lobo (200)</button>
-            <button onclick="buyItem('char', '🦅', 200)">🦅 Águila (200)</button>
-            <button onclick="buyItem('char', '🦈', 250)">🦈 Tiburón (250)</button>
-            <button onclick="buyItem('char', '👽', 500)">👽 Alien (500)</button>
-        </div>
-        <h4>Estilos para Nombre</h4>
-        <button onclick="buyItem('effect', 'glow-gold', 500)" class="glow-gold">Oro (500)</button>
-        <button onclick="buyItem('effect', 'glow-neon', 500)" class="glow-neon">Neón (500)</button>
-        <button onclick="document.getElementById('storeModal').classList.add('hidden')" style="margin-top:15px; border-color:#7f8c8d; color:#7f8c8d;">Cerrar Tienda</button>
-    </div>
-
-    <div id="chatBox" class="minimized hidden" onclick="if(this.classList.contains('minimized')) this.classList.remove('minimized')">
-        <div class="chat-header" onclick="event.stopPropagation(); document.getElementById('chatBox').classList.add('minimized')"><h4>💬 Chat</h4><span>▼</span></div>
-        <div id="chatMessages"></div>
-        <div class="chat-input-area"><input type="text" id="chatInput" placeholder="Mensaje..."><button onclick="sendTypedChat()">Enviar</button></div>
-        <div class="chat-emotes">
-            <button class="emote-btn" onclick="sendChat('🃏')">🃏</button>
-            <button class="emote-btn" onclick="sendChat('😂')">😂</button>
-            <button class="emote-btn" onclick="sendChat('😡')">😡</button>
-            <button class="emote-btn" onclick="sendChat('🤠')">🤠</button>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000, timeout: 60000 });
-        
-        let currentRoomId = '', myName = '', miTurno = false, currentPhase = 'draw', soyHost = false, soyEspectador = false;
-        let selectedCards = [], myHandData = [], activeRoomHistory = [];
-        let miPersonaje = null; let draggedElement = null; let clockInterval = null; let loggedUser = null; 
-        let selectedJokerRank = null; let selectedJokerSuit = null;
-
-        const allCharacters = ['🤠', '🤖', '💀', '🦊', '🦁', '🐍', '🐺', '🦅', '🦈', '👽']; 
-        const suitIcons = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', none: '🃏' };
-
-        function playSound(type) {}
-
-        socket.on('connect', () => { if (currentRoomId && myName) socket.emit('join_room', { roomId: currentRoomId, name: myName, activeEffect: loggedUser?.activeEffect }); });
-
-        function togglePass() { const p = document.getElementById('authPassword'); p.type = p.type === 'password' ? 'text' : 'password'; }
-        function logout() { location.reload(); }
-
-        async function register() {
-            const u = document.getElementById('authUsername').value.trim(); const p = document.getElementById('authPassword').value.trim();
-            if(!u || !p) return;
-            const res = await fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) });
-            const d = await res.json(); document.getElementById('authError').innerText = d.message || d.error;
-        }
-
-        async function login() {
-            const u = document.getElementById('authUsername').value.trim(); const p = document.getElementById('authPassword').value.trim();
-            if(!u || !p) return;
-            const res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) });
-            const d = await res.json();
-            if(res.ok) {
-                loggedUser = d.user; myName = loggedUser.username;
-                document.getElementById('profileName').innerText = loggedUser.username;
-                document.getElementById('profileName').className = loggedUser.activeEffect || '';
-                document.getElementById('profileWins').innerText = loggedUser.victories;
-                document.getElementById('profilePoints').innerText = loggedUser.points;
-                document.getElementById('authScreen').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); document.getElementById('chatBox').classList.remove('hidden');
-            } else { document.getElementById('authError').innerText = d.error; }
-        }
-
-        function loginAsGuest() {
-            let u = document.getElementById('authUsername').value.trim() || "Invitado_" + Math.floor(1000+Math.random()*9000);
-            loggedUser = { username:u, victories:0, points:0, isGuest:true, unlockedChars:['🤠', '🤖', '💀', '🦊', '🦁'] };
-            myName = u; document.getElementById('profileName').innerText = u;
-            document.getElementById('authScreen').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); document.getElementById('chatBox').classList.remove('hidden');
-        }
-
-        function createRoom() { socket.emit('create_room', { name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
-        function joinRoom() { const c = document.getElementById('roomCode').value.trim(); if(c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); } }
-        function joinSpecificRoom(id) { currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
-
-        function joinAsPlayer() { socket.emit('join_as_player', currentRoomId); }
-
-        function sendSettings() {
-            if(!soyHost) return;
-            socket.emit('change_settings', { roomId: currentRoomId, maxPlayers: document.getElementById('setPlayers').value, jokerCount: document.getElementById('setJokers').value, startingPlayerId: document.getElementById('setStarter').value, turnTime: document.getElementById('setTurnTime').value });
-        }
-
-        function addBot() {
-            if(!soyHost) return;
-            const level = document.getElementById('botLevel').value;
-            socket.emit('add_bot', { roomId: currentRoomId, level: level });
-        }
-
-        function removeBot(botId) {
-            if(!soyHost) return;
-            socket.emit('remove_bot', { roomId: currentRoomId, botId: botId });
-        }
-
-        function pickCharacter(char) { socket.emit('select_character', { roomId: currentRoomId, character: char }); }
-        function toggleReady() { socket.emit('toggle_ready', currentRoomId); }
-        function startGame() { socket.emit('start_game', currentRoomId); }
-        function leaveRoom() { socket.emit('leave_room', currentRoomId); }
-        function returnToIndividualLobby() { socket.emit('return_individual_lobby', currentRoomId); }
-        function surrenderHand() { socket.emit('surrender_hand', currentRoomId); }
-        
-        function voteKickActive() {
-            const target = prompt("Nombre del jugador a expulsar:");
-            if(target) socket.emit('vote_kick_player', { roomId: currentRoomId, targetName: target });
-        }
-
-        function actionDiscardOrKnock() {
-            if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) {
-                const cardId = selectedCards[0];
-                const cardEl = document.getElementById(cardId);
-                if(cardEl) cardEl.classList.add('card-discarding'); 
-                
-                setTimeout(() => {
-                    socket.emit('discard', { roomId: currentRoomId, cardId: cardId }); 
-                    selectedCards = [];
-                }, 250);
-            } else { socket.emit('knock', currentRoomId); }
-        }
-
-        function openStore() {
-            document.getElementById('storeModal').classList.remove('hidden');
-            document.getElementById('storeMyPoints').innerText = loggedUser ? loggedUser.points : 0;
-        }
-
-        async function openRanking() {
-            document.getElementById('rankingModal').classList.remove('hidden');
-            const list = document.getElementById('rankingList'); list.innerHTML = 'Cargando...';
-            const res = await fetch('/api/ranking'); const data = await res.json();
-            list.innerHTML = data.map((u, i) => `<div style="padding:4px 0; border-bottom:1px solid var(--border-glass);"><strong>#${i+1}</strong> ${u.username} - ${u.victories} ganadas</div>`).join('');
-        }
-
-        async function buyItem(type, item, price) {
-            if(!loggedUser || loggedUser.isGuest) return alert('¡Crea una cuenta registrada para poder comprar en la tienda!');
-            const res = await fetch('/api/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: loggedUser.username, item, price, type }) });
-            const data = await res.json();
-            if(res.ok) {
-                loggedUser.points = data.points; 
-                if(type === 'char') loggedUser.unlockedChars = data.unlockedChars;
-                if(type === 'effect') { loggedUser.activeEffect = data.activeEffect; document.getElementById('profileName').className = loggedUser.activeEffect; }
-                document.getElementById('profilePoints').innerText = loggedUser.points; document.getElementById('storeMyPoints').innerText = loggedUser.points;
-                alert("¡Compra exitosa!");
-            } else { alert(data.error); }
-        }
-
-        function showJokerModal() {
-            const modal = document.getElementById('jokerModal');
-            const ranksContainer = document.getElementById('jokerRanks');
-            const suitsContainer = document.getElementById('jokerSuits');
-            ranksContainer.innerHTML = ''; suitsContainer.innerHTML = '';
-            selectedJokerRank = null; selectedJokerSuit = null;
-
-            ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(r => {
-                const btn = document.createElement('button'); btn.className = 'joker-btn'; btn.innerText = r;
-                btn.onclick = () => { selectedJokerRank = r; Array.from(ranksContainer.children).forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); };
-                ranksContainer.appendChild(btn);
-            });
-
-            const suitsData = [ { id: 'hearts', icon: '♥', color: '#ff0055' }, { id: 'diamonds', icon: '♦', color: '#ff0055' }, { id: 'clubs', icon: '♣', color: '#1a1c2e' }, { id: 'spades', icon: '♠', color: '#1a1c2e' } ];
-            suitsData.forEach(s => {
-                const btn = document.createElement('button'); btn.className = 'joker-suit-btn';
-                btn.innerHTML = `<span style="color:${s.color};">${s.icon}</span>`;
-                btn.onclick = () => { selectedJokerSuit = s.id; Array.from(suitsContainer.children).forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); };
-                suitsContainer.appendChild(btn);
-            });
-
-            modal.classList.remove('hidden');
-        }
-
-        function confirmJoker() {
-            if(!selectedJokerRank || !selectedJokerSuit) return alert("⚠️ Selecciona el Número y el Palo.");
-            document.getElementById('jokerModal').classList.add('hidden');
-            socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards, jokerRank: selectedJokerRank, jokerSuit: selectedJokerSuit });
-            selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            document.getElementById('discardKnockBtn').innerText = "¡GOLPE!";
-        }
-
-        function cancelJoker() {
-            document.getElementById('jokerModal').classList.add('hidden');
-            selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            document.getElementById('discardKnockBtn').innerText = "¡GOLPE!";
-        }
-
-        function drawCard(source) {
-            if (!miTurno || currentPhase !== 'draw') return;
-            if (source === 'discard') {
-                if (document.getElementById('discardSlot').innerText.includes('Vacío')) return;
-                if (selectedCards.length < 2) return alert("Selecciona mínimo 2 cartas de tu mano.");
-                const hasJoker = selectedCards.some(id => myHandData.find(c => c.id === id && c.id.includes('Joker')));
-                if (hasJoker) return showJokerModal();
-                socket.emit('pick_discard_with_meld', { roomId: currentRoomId, selectedIds: selectedCards }); selectedCards = [];
-            } else { socket.emit('draw_card', { roomId: currentRoomId, source: 'deck' }); }
-        }
-
-        function handleCardClick(cardId) {
-            const idx = selectedCards.indexOf(cardId); if (idx > -1) selectedCards.splice(idx, 1); else selectedCards.push(cardId);
-            document.querySelectorAll('#myHand .card').forEach(c => c.classList.toggle('selected', selectedCards.includes(c.id)));
-            const btn = document.getElementById('discardKnockBtn');
-            if (miTurno && currentPhase === 'discard' && selectedCards.length === 1) btn.innerText = "DESCARTAR"; else btn.innerText = "¡GOLPE!";
-        }
-
-        function tauntCard() {
-            if (selectedCards.length === 1) { 
-                socket.emit('taunt_card', { roomId: currentRoomId, cardId: selectedCards[0] }); 
-                selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            } else { alert("Selecciona 1 carta de tu mano para burlarte."); }
-        }
-
-        socket.on('show_taunt', ({ playerId, card }) => {
-            let avatarDiv = document.getElementById(`avatar-${playerId}`); if (!avatarDiv && playerId === socket.id && !soyEspectador) avatarDiv = document.getElementById('localAvatarArea'); if (!avatarDiv) return;
-            
-            const popup = document.createElement('div'); popup.className = 'taunt-popup card ' + (card.id.includes('Joker')?'joker':card.suit);
-            popup.innerHTML = `<div>${card.rank}</div><div style="font-size:22px;text-align:center;">${suitIcons[card.suit]||'🃏'}</div><div></div>`; 
-            avatarDiv.appendChild(popup); playSound('taunt');
-            
-            const table = document.querySelector('.poker-table');
-            const tableRect = table.getBoundingClientRect();
-            const avatarRect = avatarDiv.getBoundingClientRect();
-            const tableCX = tableRect.left + tableRect.width / 2;
-            const tableCY = tableRect.top + tableRect.height / 2;
-            const avatarCX = avatarRect.left + avatarRect.width / 2;
-            const avatarCY = avatarRect.top + avatarRect.height / 2;
-            const diffX = tableCX - avatarCX;
-            const diffY = tableCY - avatarCY;
-            
-            const moveX = diffX * 0.45; const moveY = diffY * 0.45; 
-
-            popup.animate([ 
-                { opacity: 0, transform: `translate(0px, 0px) scale(0.2)` }, 
-                { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1.3)`, offset: 0.2 }, 
-                { opacity: 1, transform: `translate(${moveX}px, ${moveY}px) scale(1.3)`, offset: 0.8 }, 
-                { opacity: 0, transform: `translate(${moveX}px, ${moveY}px) scale(0.5)` } 
-            ], { duration: 2500, fill: 'forwards' });
-            setTimeout(() => popup.remove(), 2500);
-        });
-
-        socket.on('room_joined', ({ roomId }) => { currentRoomId = roomId; document.getElementById('lobby').classList.add('hidden'); });
-        socket.on('left_room', () => { document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('lobby').classList.remove('hidden'); });
-        socket.on('force_to_lobby', () => { document.getElementById('gameBoard').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('waitingRoom').classList.remove('hidden'); selectedCards = []; });
-
-        socket.on('update_lobby', (room) => {
-            soyHost = (room.hostId === socket.id); activeRoomHistory = room.history || [];
-            soyEspectador = room.spectators.some(s => s.id === socket.id);
-
-            document.getElementById('waitingRoom').classList.remove('hidden'); document.getElementById('displayCode').innerText = room.id;
-            
-            if (soyHost) {
-                document.getElementById('hostSettingsArea').classList.remove('hidden'); document.getElementById('setTurnTime').value = room.turnTime || "30"; document.getElementById('setPlayers').value = room.maxPlayers || "5"; document.getElementById('setJokers').value = room.jokerCount || "2";
-                const selectStarter = document.getElementById('setStarter'); selectStarter.innerHTML = '';
-                room.players.forEach(p => { selectStarter.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
-            } else {
-                document.getElementById('hostSettingsArea').classList.add('hidden');
+        let subsets = getSubsets(currentHand);
+        for (let subset of subsets) {
+            if (isValidMelding(subset)) {
+                let remaining = [...currentHand];
+                for (let card of subset) { let idx = remaining.findIndex(c => c.id === card.id); remaining.splice(idx, 1); }
+                evaluate(remaining, currentTableGroups, [...currentFormedGroups, subset]);
             }
-            
-            const grid = document.getElementById('charactersGrid'); grid.innerHTML = '';
-            const takenChars = room.players.map(p => p.character).filter(Boolean);
-            const myUnlocked = loggedUser ? loggedUser.unlockedChars : ['🤠', '🤖', '💀', '🦊', '🦁'];
-
-            allCharacters.forEach(char => {
-                const isUnlocked = myUnlocked.includes(char);
-                if (!isUnlocked) grid.innerHTML += `<button class="char-btn" style="opacity:0.3;" disabled>🔒</button>`;
-                else grid.innerHTML += `<button class="char-btn ${char===miPersonaje?'my-selection':''}" onclick="pickCharacter('${char}')" ${takenChars.includes(char)&&char!==miPersonaje?'disabled':''}>${char}</button>`;
-            });
-
-            const list = document.getElementById('playerList'); list.innerHTML = ''; let readyCount = 0;
-            room.players.forEach(p => {
-                if(p.id===socket.id) miPersonaje = p.character; if (p.ready && p.inLobby) readyCount++;
-                let statusBadge = p.offline ? '📡 DESCONECTADO' : (p.ready ? '✅ LISTO' : '⏳ PENSANDO');
-                let removeBtn = (soyHost && p.isBot) ? `<button onclick="removeBot('${p.id}')" style="background:#c0392b; border:none; padding:2px 6px; margin:0 0 0 5px; font-size:10px;">❌</button>` : '';
-
-                list.innerHTML += `<div class="player-list-item">
-                    <span class="${p.activeEffect}" style="${p.activeEffect}">${p.character || '❓'} ${p.name}</span>
-                    <div style="display:flex; align-items:center;">${statusBadge}${removeBtn}</div>
-                </div>`;
-            });
-
-            const specList = document.getElementById('spectatorList');
-            specList.innerHTML = room.spectators.length > 0 
-                ? room.spectators.map(s => `<div><span style="${s.activeEffect}">👀 ${s.name}</span></div>`).join('') 
-                : '<span style="color:#aaa;">Ninguno.</span>';
-
-            const joinBtn = document.getElementById('joinFromSpecBtn');
-            if (soyEspectador && room.players.length < room.maxPlayers) {
-                joinBtn.classList.remove('hidden');
-            } else {
-                joinBtn.classList.add('hidden');
-            }
-
-            if (soyEspectador) {
-                document.getElementById('charactersGrid').classList.add('hidden');
-                document.getElementById('charTitle').classList.add('hidden');
-                document.getElementById('readyBtn').classList.add('hidden');
-            } else {
-                document.getElementById('charactersGrid').classList.remove('hidden');
-                document.getElementById('charTitle').classList.remove('hidden');
-                document.getElementById('readyBtn').classList.remove('hidden');
-            }
-
-            if (soyHost && readyCount === room.players.length && room.players.length >= 2) document.getElementById('startBtn').classList.remove('hidden'); else document.getElementById('startBtn').classList.add('hidden');
-        });
-
-        socket.on('update_hand', (hand) => {
-            myHandData = hand; document.getElementById('waitingRoom').classList.add('hidden'); document.getElementById('victoryModal').classList.add('hidden'); document.getElementById('gameBoard').classList.remove('hidden');
-            const container = document.getElementById('myHand'); container.innerHTML = '';
-            hand.forEach(c => {
-                const sClass = c.id.includes('Joker') ? 'joker' : c.suit; const cardDiv = document.createElement('div');
-                cardDiv.className = `card ${sClass}`; cardDiv.id = c.id; cardDiv.onclick = () => handleCardClick(c.id);
-                cardDiv.innerHTML = `<div>${c.rank}</div><div>${suitIcons[c.suit] || '🃏'}</div><div></div>`; container.appendChild(cardDiv);
-                makeCardDraggable(cardDiv);
-            });
-        });
-
-        function handleGroupClick(groupId) {
-            if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 1) { socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] }); selectedCards = []; }
         }
 
-        function handleUnplug(groupId, cardId, event) {
-            event.stopPropagation(); if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 0) socket.emit('unplug_card', { roomId: currentRoomId, groupId: groupId, cardId: cardId });
-        }
-
-        function makeCardDraggable(el) {
-            el.setAttribute('draggable', 'true');
-            el.addEventListener('dragstart', () => { draggedElement = el; el.style.opacity = '0.4'; });
-            el.addEventListener('dragover', (e) => { e.preventDefault(); if (draggedElement && draggedElement !== el) { const cards = [...document.getElementById('myHand').children]; if (cards.indexOf(draggedElement) < cards.indexOf(el)) el.after(draggedElement); else el.before(draggedElement); } });
-            el.addEventListener('dragend', () => { if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; } const newOrder = [...document.getElementById('myHand').children].map(c => c.id); socket.emit('reorder_hand', { roomId: currentRoomId, newOrder }); });
-            el.addEventListener('touchstart', () => { draggedElement = el; el.style.opacity = '0.4'; }, { passive: true });
-            el.addEventListener('touchmove', (e) => { if (!draggedElement) return; e.preventDefault(); const touch = e.touches[0]; const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.card'); if (target && target !== draggedElement && target.parentElement === document.getElementById('myHand')) { const cards = [...document.getElementById('myHand').children]; if (cards.indexOf(draggedElement) < cards.indexOf(target)) target.after(draggedElement); else target.before(draggedElement); } }, { passive: false });
-            el.addEventListener('touchend', () => { if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; } const newOrder = [...document.getElementById('myHand').children].map(c => c.id); socket.emit('reorder_hand', { roomId: currentRoomId, newOrder }); });
-        }
-
-        function getSeatPosition(index, totalOthers) {
-            if (totalOthers === 1) return { top: '10%', left: '50%', transform: 'translateX(-50%)' };
-            if (totalOthers === 2) { if (index === 0) return { top: '25%', left: '85%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '25%', left: '15%' }; }
-            if (totalOthers === 3) { if (index === 0) return { top: '40%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '40%', left: '10%' }; }
-            if (totalOthers >= 4) { if (index === 0) return { top: '50%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '75%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '15%', left: '25%' }; if (index === 3) return { top: '50%', left: '10%' }; }
-            return { top: '0', left: '0' };
-        }
-
-        socket.on('update_game', (room) => {
-            document.getElementById('deckCount').innerText = room.deckCount; currentPhase = room.phase;
-            document.getElementById('nextTurnDisplay').innerText = room.nextTurnName;
-            
-            const timerEl = document.getElementById('timerDisplay');
-            if (room.timerExpires) { timerEl.style.display = 'inline-block'; clearInterval(clockInterval); clockInterval = setInterval(() => { let left = Math.max(0, Math.ceil((room.timerExpires - Date.now()) / 1000)); timerEl.innerText = `⏱️ ${left}s`; }, 1000); } else { timerEl.style.display = 'none'; }
-
-            const oppArea = document.getElementById('opponentsArea'); oppArea.innerHTML = ''; let orderedOpponents = [];
-            if (!soyEspectador) { const myIndex = room.players.findIndex(p => p.id === socket.id); for(let i=1; i < room.players.length; i++) { orderedOpponents.push(room.players[(myIndex + i) % room.players.length]); } } else { orderedOpponents = room.players; }
-
-            orderedOpponents.forEach((p, index) => {
-                const pos = getSeatPosition(index, orderedOpponents.length); const isTurn = room.turnId === p.id;
-                let avatarSymbol = p.offline ? '📡' : (p.character || '❓');
-                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon" style="${p.activeEffect}">${avatarSymbol}</div><div class="avatar-name" style="${p.activeEffect}">${p.name}</div></div>`;
-            });
-
-            miTurno = (room.turnId === socket.id);
-            document.getElementById('turnIndicator').innerText = miTurno ? "¡TU TURNO!" : "Esperando al resto...";
-            const miAvatar = document.getElementById('localAvatarArea');
-            if(miTurno) miAvatar.classList.add('active-turn'); else miAvatar.classList.remove('active-turn');
-            
-            const slot = document.getElementById('discardSlot');
-            if(room.topDiscard) { const c = room.topDiscard; const sClass = c.id.includes('Joker') ? 'joker' : c.suit; slot.innerHTML = `<div class="card ${sClass}" style="pointer-events:none;"><div>${c.rank}</div><div style="font-size:25px; text-align:center;">${suitIcons[c.suit] || '🃏'}</div><div></div></div>`; } else { slot.innerHTML = `<div class="deck-slot">Vacío</div>`; }
-
-            const area = document.getElementById('exposedArea'); area.innerHTML = '';
-            room.exposedGroups.forEach(g => {
-                let cardsHTML = ''; g.cards.forEach(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)" class="card ${sClass}" style="display:inline-flex; transform:scale(0.8); margin:0 -5px;"><div>${c.rank}</div><div style="font-size:20px; text-align:center;">${suitIcons[c.suit]}</div><div></div></span>`; });
-                area.innerHTML += `<div class="exposed-group" onclick="handleGroupClick('${g.id}')">${cardsHTML}</div>`;
-            });
-        });
-
-        socket.on('game_over', ({ scores, knocker, winner, exposedGroups, wasVolteado }) => {
-            document.getElementById('knockerName').innerText = `Golpeó la mesa: ${knocker}`;
-            document.getElementById('victoryAlert').innerText = `Ganador de la Ronda: ${winner}`;
-            
-            const exposedDiv = document.getElementById('modalExposedGroups');
-            exposedDiv.innerHTML = '';
-            if (exposedGroups && exposedGroups.length > 0) {
-                exposedGroups.forEach(g => {
-                    let cardsHtml = g.cards.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.65); margin-right:-15px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
-                    exposedDiv.innerHTML += `<div style="display:inline-block; background:rgba(0,0,0,0.5); padding:5px; margin:5px; border-radius:5px; border:1px solid var(--magenta-neon);"><div style="font-size:10px; color:var(--cyan-neon);">${g.ownerName}</div><div style="display:flex; padding-right:15px;">${cardsHtml}</div></div>`;
-                });
-            } else { exposedDiv.innerHTML = '<span style="font-size:11px; color:#aaa;">No se bajaron juegos a la mesa en esta ronda.</span>'; }
-
-            const tbody = document.getElementById('modalScoreBody'); tbody.innerHTML = '';
-            scores.forEach(s => {
-                let handHtml = '';
-                if(s.finalHand.length === 0) {
-                    handHtml = '<span style="font-size:11px; color:#aaa;">(Se retiró de la ronda)</span>';
-                } else {
-                    handHtml = s.finalHand.map(c => { const sClass = c.id.includes('Joker') ? 'joker' : c.suit; return `<span class="card ${sClass}" style="display:inline-flex; transform:scale(0.7); margin-right:-12px; pointer-events:none; font-size:10px;"><div>${c.rank}</div><div style="font-size:18px; text-align:center;">${suitIcons[c.suit]||'🃏'}</div><div></div></span>`; }).join('');
+        for (let i = 0; i < currentHand.length; i++) {
+            let card = currentHand[i];
+            for (let g = 0; g < currentTableGroups.length; g++) {
+                let group = currentTableGroups[g];
+                if (group.cards.length < 4 && isValidMelding([...group.cards, card])) {
+                    let remainingHand = [...currentHand]; remainingHand.splice(i, 1);
+                    let nextGroups = currentTableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, card] }; return tg; });
+                    evaluate(remainingHand, nextGroups, currentFormedGroups);
                 }
-                tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-glass);"><td style="text-align:left; padding:5px;"><strong>${s.character} ${s.name}</strong><div style="display:flex; flex-wrap:wrap; padding-right:12px;">${handHtml}</div></td><td style="font-size:16px; color:var(--cyan-neon); font-weight:bold;">${s.score} pts</td></tr>`;
-            });
-            document.getElementById('victoryModal').classList.remove('hidden');
-        });
+            }
+        }
+    }
+    evaluate(hand, exposedGroups || [], []);
+    return { score: bestScore, orderedHand: bestArrangement }; 
+};
 
-        socket.on('chat_msg', ({ sender, msg, character }) => { const m = document.getElementById('chatMessages'); m.innerHTML += `<div><strong>${character} ${sender}:</strong> ${msg}</div>`; m.scrollTop = m.scrollHeight; });
-        function sendChat(msg) { socket.emit('send_chat', { roomId: currentRoomId, msg }); }
-        function sendTypedChat() { const i = document.getElementById('chatInput'); if(i.value.trim()){ socket.emit('send_chat', { roomId: currentRoomId, msg: i.value.trim() }); i.value = ''; } }
-        socket.on('update_public_rooms', (rooms) => { document.getElementById('publicRoomsList').innerHTML = rooms.map(r => `<div class="room-item"><span>Mesa ${r.id} (${r.players}/${r.max})</span><button onclick="joinSpecificRoom('${r.id}')">Entrar</button></div>`).join(''); });
-        socket.on('error_msg', (msg) => { alert(msg); selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected')); document.getElementById('discardKnockBtn').innerText = "¡GOLPE!"; });
-    </script>
-</body>
-</html>
+const hasValidGroup = (hand) => getOptimalFinalScoreAndHand(hand, []).score < hand.reduce((sum, c) => sum + (c.id.includes('Joker') ? 0 : c.value), 0);
+const canPlugIn = (group, card) => group.length < 4 && isValidMelding([...group, card]);
+
+// FUNCIÓN PARA VERIFICAR AL HOST REAL ACTUAL
+const getRealHost = (room) => {
+    return room.players.find(p => !p.isBot);
+};
+
+const sanitizeRoom = (room) => {
+    let activePlayers = room.players.filter(p => !p.surrendered && !p.offline);
+    let currentActiveIdx = activePlayers.findIndex(p => p.id === room.players[room.turnIndex]?.id);
+    let nextTurnName = "...";
+    if (activePlayers.length > 1 && currentActiveIdx !== -1) { let nextPlayer = activePlayers[(currentActiveIdx + 1) % activePlayers.length]; if (nextPlayer) nextTurnName = nextPlayer.name; }
+
+    return {
+        id: room.id, 
+        hostId: getRealHost(room)?.id, // EL HOST SIEMPRE SERÁ EL PRIMER JUGADOR REAL
+        players: room.players.map(p => ({ id: p.id, name: p.name, cardCount: p.hand.length, character: p.character, ready: p.ready, surrendered: p.surrendered, offline: p.offline, inLobby: p.inLobby, activeEffect: p.activeEffect, isBot: p.isBot })),
+        spectators: room.spectators.map(s => ({ id: s.id, name: s.name, activeEffect: s.activeEffect })), 
+        topDiscard: room.discardPile[room.discardPile.length - 1] || null, 
+        turnId: room.players[room.turnIndex]?.id, deckCount: room.deck.length, phase: room.phase, exposedGroups: room.exposedGroups, maxPlayers: room.maxPlayers, 
+        jokerCount: room.jokerCount, turnTime: room.turnTime, state: room.state, startingPlayerId: room.startingPlayerId, history: room.history, timerExpires: room.timerExpires, nextTurnName: nextTurnName
+    };
+};
+
+// --- MOTOR DE BOTS Y TURNOS ---
+const startTurnTimer = (roomId) => {
+    const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
+    clearTimeout(room.turnTimer);
+    
+    let currentPlayer = room.players[room.turnIndex];
+    if (currentPlayer && currentPlayer.isBot) {
+        room.timerExpires = Date.now() + 4000;
+        executeBotPlay(roomId, currentPlayer);
+    } else {
+        const ms = room.turnTime * 1000; room.timerExpires = Date.now() + ms;
+        room.turnTimer = setTimeout(() => { executeAutoPlay(roomId); }, ms);
+    }
+};
+
+const executeBotPlay = (roomId, bot) => {
+    const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
+    
+    setTimeout(() => {
+        let tookDiscard = false;
+        let topDiscard = room.discardPile[room.discardPile.length - 1];
+        
+        if (topDiscard && bot.difficulty >= 3) {
+            let simHand = [...bot.hand, topDiscard];
+            if (getOptimalFinalScoreAndHand(simHand, room.exposedGroups).score < getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups).score) {
+                room.discardPile.pop(); bot.hand.push(topDiscard); tookDiscard = true;
+            }
+        }
+        
+        if (!tookDiscard) {
+            if (room.deck.length === 0) { room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [room.deck.pop()]; }
+            bot.hand.push(room.deck.pop());
+        }
+
+        room.phase = 'discard';
+        io.to(roomId).emit('update_game', sanitizeRoom(room));
+
+        setTimeout(() => {
+            let finalOpt = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
+            let hasExposed = room.exposedGroups.some(g => g.ownerName === bot.name);
+            let canKnock = hasExposed || (finalOpt.score < bot.hand.reduce((acc, c) => acc + (c.id.includes('Joker') ? 0 : c.value), 0));
+            
+            let knockThreshold = 25 - (bot.difficulty * 5);
+            if (bot.difficulty >= 2 && canKnock && finalOpt.score <= knockThreshold) {
+                return forceGameOver(roomId, bot.id);
+            }
+
+            let cardToDiscard;
+            if (bot.difficulty >= 2 && finalOpt.orderedHand.length > 0) {
+                let dropId = finalOpt.orderedHand[finalOpt.orderedHand.length - 1].id;
+                cardToDiscard = bot.hand.find(c => c.id === dropId);
+            } else {
+                cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)];
+            }
+            
+            if (!cardToDiscard) cardToDiscard = bot.hand[0];
+            let idx = bot.hand.findIndex(c => c.id === cardToDiscard.id);
+            bot.hand.splice(idx, 1); room.discardPile.push(cardToDiscard);
+
+            io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `🤖 ${bot.name} terminó su turno.`, character: '👾' });
+            nextTurn(roomId);
+
+        }, 1500);
+
+    }, 1500);
+};
+
+const executeAutoPlay = (roomId) => {
+    const room = rooms[roomId]; if (!room) return;
+    const player = room.players[room.turnIndex]; if (!player) return;
+
+    if (room.phase === 'draw') {
+        if (room.deck.length === 0 && room.discardPile.length > 1) { const topDiscard = room.discardPile.pop(); room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard]; }
+        let card = room.deck.pop(); if (card) player.hand.push(card);
+    }
+    
+    let candidates = player.hand.filter(c => !c.id.includes('Joker'));
+    if (candidates.length === 0 && player.hand.length > 0) candidates = player.hand;
+
+    if (candidates.length > 0) {
+        const dropCard = candidates[Math.floor(Math.random() * candidates.length)];
+        const dropIdx = player.hand.findIndex(c => c.id === dropCard.id);
+        player.hand.splice(dropIdx, 1); room.discardPile.push(dropCard);
+    }
+
+    io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `⏳ Tiempo agotado. Auto-descarte para ${player.name}.`, character: '🤖' });
+    io.to(player.id).emit('update_hand', player.hand); nextTurn(roomId);
+};
+
+const nextTurn = (roomId) => {
+    const room = rooms[roomId]; if (!room) return;
+    let attempts = 0;
+    do { 
+        room.turnIndex = (room.turnIndex + 1) % room.players.length; attempts++; 
+    } while (room.players[room.turnIndex] && (room.players[room.turnIndex].surrendered || room.players[room.turnIndex].offline) && attempts < room.players.length);
+    
+    room.phase = 'draw'; startTurnTimer(roomId); io.to(roomId).emit('update_game', sanitizeRoom(room));
+};
+
+const forceGameOver = async (roomId, knockerId) => {
+    const room = rooms[roomId]; if (!room) return;
+    clearTimeout(room.turnTimer); room.state = 'finished'; room.players.forEach(p => p.inLobby = false); 
+
+    const scores = room.players.map(p => {
+        let opt = getOptimalFinalScoreAndHand(p.hand, room.exposedGroups);
+        let finalScore = p.surrendered ? opt.score + 20 : opt.score;
+        return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0 };
+    });
+
+    let knockerName = 'Mesa Cerrada'; let wasVolteado = false;
+    if (knockerId) {
+        let knockerIndex = room.players.findIndex(p => p.id === knockerId);
+        if (knockerIndex > -1) {
+            knockerName = room.players[knockerIndex].name;
+            scores.forEach(s => { let pIndex = room.players.findIndex(p => p.id === s.id); s.turnDiff = (pIndex - knockerIndex + room.players.length) % room.players.length; });
+        }
+    }
+
+    scores.sort((a, b) => { if (a.score === b.score) return a.turnDiff - b.turnDiff; return a.score - b.score; });
+    const winner = scores[0];
+    if (knockerId && winner.id !== knockerId) wasVolteado = true;
+
+    const allHandsData = room.players.map(p => ({ name: p.name, character: p.character || '🤠', hand: p.hand }));
+    room.history.push({ winner: winner.name, score: winner.score, hand: winner.finalHand, wasVolteado: wasVolteado, allHands: allHandsData });
+
+    try { if (mongoose.connection.readyState === 1 && !room.players.find(p=>p.name===winner.name)?.isBot) { await User.findOneAndUpdate({ username: winner.name }, { $inc: { victories: 1, points: 50 } }); } } catch (e) {}
+
+    io.to(roomId).emit('game_over', { scores, knocker: knockerName, winner: winner.name, wasVolteado, exposedGroups: room.exposedGroups });
+    io.to(roomId).emit('update_lobby', sanitizeRoom(room)); 
+};
+
+// GESTIÓN DE SALIDAS Y HERENCIA DE ADMIN
+const handleLeaveRoom = (socket, roomId, forceRemove = false) => {
+    let room = rooms[roomId]; if (!room) return false; let changed = false;
+    let specIdx = room.spectators.findIndex(s => s.id === socket.id);
+    if (specIdx > -1) { room.spectators.splice(specIdx, 1); changed = true; io.to(roomId).emit('update_lobby', sanitizeRoom(room));}
+
+    let idx = room.players.findIndex(p => p.id === socket.id);
+    if (idx > -1) {
+        let player = room.players[idx];
+        if (forceRemove || room.state === 'waiting' || player.isBot) {
+            room.players.splice(idx, 1);
+            
+            // CIERRE ANTI-ZOMBIE: Si ya no quedan jugadores humanos, borra la sala con los bots.
+            if (room.players.filter(p => !p.isBot).length === 0) { 
+                clearTimeout(room.turnTimer); delete rooms[roomId]; 
+            } else if (room.state === 'playing') {
+                if (room.players.length < 2) { 
+                    clearTimeout(room.turnTimer); room.state = 'waiting'; 
+                    room.players.forEach(p => p.inLobby = true); 
+                    io.to(roomId).emit('force_to_lobby'); 
+                    io.to(roomId).emit('update_lobby', sanitizeRoom(room)); 
+                } else { 
+                    if (room.turnIndex === idx) { room.turnIndex = room.turnIndex % room.players.length; room.phase = 'draw'; startTurnTimer(roomId); } 
+                    else if (room.turnIndex > idx) { room.turnIndex--; } 
+                    io.to(roomId).emit('update_game', sanitizeRoom(room)); 
+                }
+            } else if (room.state === 'waiting') {
+                io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+            }
+        } else {
+            player.offline = true;
+            io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `⚠️ ${player.name} perdió la conexión.`, character: '📡' });
+            if (room.turnIndex === idx) nextTurn(roomId);
+            io.to(roomId).emit('update_game', sanitizeRoom(room));
+        }
+        changed = true;
+    }
+    return changed;
+};
+
+// --- SOCKETS ---
+io.on('connection', (socket) => {
+    socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
+
+    socket.on('join_room', ({ roomId, name, activeEffect }) => {
+        let room = rooms[roomId]; if (!room) return socket.emit('error_msg', '⚠️ La mesa no existe.');
+        const existingPlayer = room.players.find(p => p.name === name);
+        const existingSpectator = room.spectators.find(s => s.name === name);
+
+        if (existingPlayer) {
+            existingPlayer.id = socket.id; existingPlayer.offline = false;
+            socket.join(roomId); socket.emit('room_joined', { roomId }); 
+            io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `✅ ${name} se ha reconectado.`, character: '🔌' });
+            if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
+            return io.to(roomId).emit('update_game', sanitizeRoom(room));
+        }
+        
+        // Entrar a observar si está en juego, o si el lobby ya está lleno
+        if (room.state === 'playing' || room.state === 'finished' || room.players.length >= room.maxPlayers) {
+            if (!existingSpectator) room.spectators.push({ id: socket.id, name, character: '👀', activeEffect: activeEffect || '', lastMsg: '', msgCount: 0, mutedUntil: 0 });
+            else existingSpectator.id = socket.id;
+            
+            socket.join(roomId); socket.emit('room_joined', { roomId }); broadcastPublicRooms(); 
+            if (room.state === 'waiting') return io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+            return io.to(roomId).emit('update_game', sanitizeRoom(room)); 
+        }
+
+        room.players.push({ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '', isBot: false });
+        socket.join(roomId); socket.emit('room_joined', { roomId }); io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+    });
+
+    socket.on('join_as_player', (roomId) => {
+        const room = rooms[roomId]; if (!room || room.state !== 'waiting') return;
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ La mesa ya está llena.');
+        
+        const specIdx = room.spectators.findIndex(s => s.id === socket.id);
+        if (specIdx > -1) {
+            const spec = room.spectators.splice(specIdx, 1)[0];
+            room.players.push({ id: spec.id, name: spec.name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: spec.activeEffect || '', isBot: false });
+            io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+        }
+    });
+
+    socket.on('create_room', ({ name, activeEffect }) => {
+        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        rooms[roomId] = { id: roomId, players: [{ id: socket.id, name, character: null, ready: false, surrendered: false, hand: [], offline: false, lastMsg: '', msgCount: 0, mutedUntil: 0, inLobby: true, activeEffect: activeEffect || '', isBot: false }], spectators: [], deck: [], discardPile: [], turnIndex: 0, state: 'waiting', phase: 'draw', exposedGroups: [], history: [], maxPlayers: 5, jokerCount: 2, turnTime: 30, startingPlayerId: socket.id, turnTimer: null, timerExpires: 0 };
+        socket.join(roomId); socket.emit('room_joined', { roomId }); io.to(roomId).emit('update_lobby', sanitizeRoom(rooms[roomId])); broadcastPublicRooms();
+    });
+
+    socket.on('add_bot', ({ roomId, level }) => {
+        const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id) return;
+        if (room.players.length >= room.maxPlayers) return socket.emit('error_msg', '⚠️ Mesa llena.');
+        let colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6']; let color = colors[parseInt(level) - 1] || '#fff';
+        room.players.push({ id: 'bot_'+Math.random().toString(36).substring(7), isBot: true, difficulty: parseInt(level), name: `Bot Lvl ${level}`, character: '👾', ready: true, surrendered: false, hand: [], offline: false, inLobby: true, activeEffect: `color: ${color}; text-shadow: 0 0 5px ${color};` });
+        io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+    });
+
+    socket.on('remove_bot', ({ roomId, botId }) => {
+        const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id || room.state !== 'waiting') return;
+        const idx = room.players.findIndex(p => p.id === botId && p.isBot);
+        if (idx > -1) { room.players.splice(idx, 1); io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms(); }
+    });
+
+    socket.on('change_settings', ({ roomId, maxPlayers, jokerCount, startingPlayerId, turnTime }) => {
+        const room = rooms[roomId]; let host = getRealHost(room); if (!room || !host || host.id !== socket.id) return;
+        room.maxPlayers = parseInt(maxPlayers); room.jokerCount = parseInt(jokerCount); room.startingPlayerId = startingPlayerId; room.turnTime = parseInt(turnTime);
+        io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+    });
+
+    socket.on('select_character', ({ roomId, character }) => {
+        const room = rooms[roomId]; if (!room) return;
+        if (room.players.some(p => p.character === character && !p.isBot)) return socket.emit('error_msg', '⚠️ Ocupado.');
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) { player.character = character; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
+    });
+
+    socket.on('toggle_ready', (roomId) => {
+        const room = rooms[roomId]; if (!room) return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) { if (!player.character) return socket.emit('error_msg', '⚠️ Selecciona un personaje.'); player.ready = !player.ready; io.to(roomId).emit('update_lobby', sanitizeRoom(room)); }
+    });
+
+    socket.on('start_game', (roomId) => {
+        const room = rooms[roomId]; let host = getRealHost(room);
+        if (!room || !host || host.id !== socket.id || !room.players.every(p => p.ready && p.inLobby) || room.players.length < 2) return socket.emit('error_msg', '⚠️ Todos listos para iniciar.');
+
+        room.state = 'playing'; room.deck = createDeck(room.jokerCount); room.discardPile = []; room.exposedGroups = [];
+        room.turnIndex = room.players.findIndex(p => p.id === room.startingPlayerId); if (room.turnIndex === -1) room.turnIndex = 0;
+
+        room.players.forEach(p => { p.hand = room.deck.splice(0, 7); p.surrendered = false; p.inLobby = false; });
+        room.players[room.turnIndex].hand.push(room.deck.pop()); 
+        
+        room.players.filter(p=>!p.isBot).forEach(p => { io.to(p.id).emit('update_hand', p.hand); });
+        room.phase = 'discard'; startTurnTimer(roomId); io.to(roomId).emit('update_game', sanitizeRoom(room)); broadcastPublicRooms();
+    });
+
+    socket.on('surrender_hand', (roomId) => {
+        const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player && !player.surrendered) {
+            player.surrendered = true; 
+            let activePlayers = room.players.filter(p => !p.surrendered && !p.offline);
+            if (activePlayers.length <= 1) { forceGameOver(roomId, null); } else { if (room.players[room.turnIndex].id === socket.id) nextTurn(roomId); else io.to(roomId).emit('update_game', sanitizeRoom(room)); }
+        }
+    });
+
+    socket.on('return_individual_lobby', (roomId) => {
+        const room = rooms[roomId]; if (!room) return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.inLobby = true; socket.emit('force_to_lobby'); 
+            if (room.players.filter(p=>!p.isBot).every(p => p.inLobby)) { room.state = 'waiting'; room.deck = []; room.discardPile = []; room.exposedGroups = []; room.players.forEach(p => { p.hand = []; p.ready = p.isBot?true:false; p.surrendered = false; }); }
+            io.to(roomId).emit('update_lobby', sanitizeRoom(room)); broadcastPublicRooms();
+        }
+    });
+
+    socket.on('draw_card', ({ roomId, source }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
+
+        if (source === 'deck') {
+            if (room.deck.length === 0) {
+                if (room.discardPile.length > 1) { const topDiscard = room.discardPile.pop(); room.deck = room.discardPile.sort(() => Math.random() - 0.5); room.discardPile = [topDiscard]; } else { return socket.emit('error_msg', '⚠️ No hay cartas.'); }
+            }
+            let card = room.deck.pop();
+            if (card) { player.hand.push(card); room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room)); }
+        }
+    });
+
+    socket.on('pick_discard_with_meld', ({ roomId, selectedIds, jokerRank, jokerSuit }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'draw') return;
+
+        let topCard = room.discardPile[room.discardPile.length - 1]; if (!topCard) return;
+        let cardsForMeld = player.hand.filter(c => selectedIds.includes(c.id));
+        
+        let tempCards = cardsForMeld.map(c => ({...c}));
+        tempCards.forEach(c => {
+            if (c.id.includes('Joker') && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
+        });
+        tempCards.push(topCard);
+
+        if (isValidMelding(tempCards)) {
+            room.discardPile.pop();
+            player.hand = player.hand.filter(c => !selectedIds.includes(c.id));
+            cardsForMeld.forEach(c => {
+                if (c.id.includes('Joker') && jokerRank && jokerSuit) { c.rank = jokerRank; c.suit = jokerSuit; c.value = getCardValue(jokerRank); }
+            });
+            cardsForMeld.push(topCard);
+            room.exposedGroups.push({ id: 'g_' + Math.random().toString(36).substr(2, 9), ownerName: player.name, cards: cardsForMeld });
+            room.phase = 'discard'; startTurnTimer(roomId); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
+        } else { socket.emit('error_msg', '⚠️ Combinación Inválida. Revisa tu grupo.'); }
+    });
+
+    socket.on('discard', ({ roomId, cardId }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
+
+        const cardIdx = player.hand.findIndex(c => c.id === cardId);
+        if (cardIdx > -1) { const card = player.hand.splice(cardIdx, 1)[0]; room.discardPile.push(card); socket.emit('update_hand', player.hand); nextTurn(roomId); }
+    });
+
+    socket.on('plug_card', ({ roomId, groupId, cardId }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
+
+        const group = room.exposedGroups.find(g => g.id === groupId);
+        if (group && group.cards.length >= 4) return socket.emit('error_msg', '⚠️ Grupo lleno (Máx 4).');
+
+        const cardIdx = player.hand.findIndex(c => c.id === cardId);
+        if (group && cardIdx > -1) {
+            let card = player.hand[cardIdx];
+            if (canPlugIn(group.cards, card)) { player.hand.splice(cardIdx, 1); group.cards.push(card); socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room)); } 
+            else { socket.emit('error_msg', '⚠️ No engancha aquí.'); }
+        }
+    });
+
+    socket.on('unplug_card', ({ roomId, groupId, cardId }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id);
+        if (!room || !player || room.players[room.turnIndex].id !== socket.id || room.phase !== 'discard') return;
+
+        const groupIdx = room.exposedGroups.findIndex(g => g.id === groupId); if (groupIdx === -1) return;
+        const group = room.exposedGroups[groupIdx];
+
+        const cardIdx = group.cards.findIndex(c => c.id === cardId);
+        if (cardIdx > -1) {
+            const card = group.cards.splice(cardIdx, 1)[0]; player.hand.push(card);
+            if (group.cards.length < 3 || !isValidMelding(group.cards)) { player.hand.push(...group.cards); room.exposedGroups.splice(groupIdx, 1); }
+            socket.emit('update_hand', player.hand); io.to(roomId).emit('update_game', sanitizeRoom(room));
+        }
+    });
+
+    socket.on('reorder_hand', ({ roomId, newOrder }) => {
+        const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) { player.hand.sort((a, b) => { let idxA = newOrder.indexOf(a.id); let idxB = newOrder.indexOf(b.id); return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB); }); }
+    });
+
+    socket.on('knock', (roomId) => {
+        const room = rooms[roomId]; const knocker = room.players.find(p => p.id === socket.id);
+        if (!room || !knocker || room.players[room.turnIndex].id !== socket.id) return;
+        if (room.phase !== 'draw') return socket.emit('error_msg', '⚠️ Golpea al inicio de tu turno, ANTES de robar.');
+        if (knocker.hand.length === 8) return socket.emit('error_msg', '⚠️ Tienes 8 cartas. Termina tu descarte.');
+
+        let hasExposed = room.exposedGroups.some(g => g.ownerName === knocker.name);
+        let hasInHand = hasValidGroup(knocker.hand);
+        if (!hasExposed && !hasInHand) return socket.emit('error_msg', '⚠️ Debes tener al menos un juego válido.');
+        forceGameOver(roomId, socket.id); 
+    });
+
+    socket.on('send_chat', ({ roomId, msg }) => {
+        const room = rooms[roomId]; if (!room) return;
+        let player = room.players.find(p => p.id === socket.id) || room.spectators.find(s => s.id === socket.id);
+        if (!player) return; io.to(roomId).emit('chat_msg', { sender: player.name, msg, character: player.character || '👀' });
+    });
+
+    socket.on('taunt_card', ({ roomId, cardId }) => {
+        const room = rooms[roomId]; const player = room.players.find(p => p.id === socket.id); if (!room || !player) return;
+        const card = player.hand.find(c => c.id === cardId);
+        if (card) io.to(roomId).emit('show_taunt', { playerId: socket.id, card });
+    });
+
+    socket.on('vote_kick_player', ({ roomId, targetName }) => {
+        const room = rooms[roomId]; let host = getRealHost(room); if(!room || !host || host.id !== socket.id) return socket.emit('error_msg', 'Solo el creador puede expulsar.');
+        handleLeaveRoom({ id: 'dummy' }, roomId, true); 
+        io.to(roomId).emit('chat_msg', { sender: 'Sistema', msg: `Expulsión en mantenimiento.`, character: '🚨' });
+    });
+
+    socket.on('leave_room', (roomId) => { if (handleLeaveRoom(socket, roomId, true)) { socket.leave(roomId); socket.emit('left_room'); broadcastPublicRooms(); } });
+    socket.on('disconnect', () => { 
+        for (let roomId in rooms) { handleLeaveRoom(socket, roomId, false); } broadcastPublicRooms(); 
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
