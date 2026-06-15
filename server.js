@@ -98,7 +98,6 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
-// MOTOR MATEMÁTICO STRICTO 
 const isValidMelding = (cards) => {
     if (cards.length < 3 || cards.length > 4) return false;
     let jokers = cards.filter(c => c.id.includes('Joker') && c.rank === 'Joker').length;
@@ -437,10 +436,32 @@ const handleLeaveRoom = (socket, roomId, forceRemove = false) => {
 io.on('connection', (socket) => {
     socket.emit('update_public_rooms', Object.values(rooms).map(r => ({ id: r.id, host: r.players[0]?.name || 'Desc', players: r.players.length, max: r.maxPlayers, state: r.state })));
 
-    socket.on('join_room', ({ roomId, name, activeEffect }) => {
+    // ACTUALIZACIÓN DE ESPECTADOR (asSpectator boolean)
+    socket.on('join_room', ({ roomId, name, activeEffect, asSpectator }) => {
         let room = rooms[roomId]; if (!room) return socket.emit('error_msg', '⚠️ La mesa no existe.');
         const existingPlayer = room.players.find(p => p.name === name);
 
+        // Si el usuario eligió "Espectar" forzosamente
+        if (asSpectator) {
+            if (existingPlayer && !existingPlayer.offline) return socket.emit('error_msg', 'Ya estás jugando en esta mesa, no puedes espectar.');
+            if (existingPlayer && existingPlayer.offline) {
+                // Reconecta al jugador si estaba jugando
+                existingPlayer.id = socket.id; existingPlayer.offline = false;
+                socket.join(roomId); socket.emit('room_joined', { roomId }); 
+                if(room.state === 'playing') socket.emit('update_hand', existingPlayer.hand); 
+                return io.to(roomId).emit('update_game', sanitizeRoom(room));
+            }
+            // Agregarlo como Espectador
+            let spec = room.spectators.find(s => s.name === name);
+            if (!spec) room.spectators.push({ id: socket.id, name, character: '👀', activeEffect: activeEffect || '', lastMsg: '', msgCount: 0, mutedUntil: 0 });
+            else spec.id = socket.id;
+            
+            socket.join(roomId); socket.emit('room_joined', { roomId }); broadcastPublicRooms(); 
+            if (room.state === 'waiting') return io.to(roomId).emit('update_lobby', sanitizeRoom(room));
+            return io.to(roomId).emit('update_game', sanitizeRoom(room)); 
+        }
+
+        // Reconexión Normal
         if (existingPlayer) {
             existingPlayer.id = socket.id; existingPlayer.offline = false;
             socket.join(roomId); socket.emit('room_joined', { roomId }); 
@@ -448,6 +469,7 @@ io.on('connection', (socket) => {
             return io.to(roomId).emit('update_game', sanitizeRoom(room));
         }
         
+        // Si entra como jugador pero está lleno o en juego, se le manda a espectador por defecto
         if (room.state === 'playing' || room.state === 'finished' || room.players.length >= room.maxPlayers) {
             let spec = room.spectators.find(s => s.name === name);
             if (!spec) room.spectators.push({ id: socket.id, name, character: '👀', activeEffect: activeEffect || '', lastMsg: '', msgCount: 0, mutedUntil: 0 });
