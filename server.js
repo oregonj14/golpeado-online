@@ -7,7 +7,6 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const server = http.createServer(app);
 
-// CONFIGURACIÓN ANTI-DESCONEXIONES BLINDADA
 const io = new Server(server, {
     pingTimeout: 120000, 
     pingInterval: 25000,
@@ -98,7 +97,6 @@ const createDeck = (jokerCount) => {
     return deck.sort(() => Math.random() - 0.5);
 };
 
-// MOTOR MATEMÁTICO STRICTO (Rechaza duplicados automáticamente)
 const isValidMelding = (cards) => {
     if (cards.length < 3 || cards.length > 4) return false;
     let jokers = cards.filter(c => c.id.includes('Joker') && c.rank === 'Joker').length;
@@ -113,7 +111,7 @@ const isValidMelding = (cards) => {
     if (normals.every(c => c.suit === normals[0].suit)) {
         const checkSeq = (vals) => {
             let sorted = [...vals].sort((a, b) => a - b);
-            // El Set detecta si se repite un número (ej. el Joker asignado como 2 y el 2 real). Rechaza si es así.
+            // RECHAZA DUPLICADOS DE JOKERS ASIGNADOS VS CARTAS REALES
             if (new Set(sorted).size !== sorted.length) return false; 
             let gaps = 0;
             for (let i = 0; i < sorted.length - 1; i++) gaps += (sorted[i+1] - sorted[i] - 1);
@@ -154,6 +152,7 @@ const getSubsetsBySize = (array, sizes) => {
     generate([], 0); return subsets;
 };
 
+// MOTOR OPTIMIZADO (MÁXIMO 1 ENCHUFE POR JUGADOR)
 const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     let bestScore = Infinity;
     let bestArrangement = [];
@@ -178,14 +177,17 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
             }
         }
 
-        for (let i = 0; i < currentHand.length; i++) {
-            let card = currentHand[i];
-            for (let g = 0; g < currentTableGroups.length; g++) {
-                let group = currentTableGroups[g];
-                if (group.cards.length < 4 && isValidMelding([...group.cards, card])) {
-                    let remainingHand = [...currentHand]; remainingHand.splice(i, 1);
-                    let nextGroups = currentTableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, card] }; return tg; });
-                    evaluate(remainingHand, nextGroups, currentFormedGroups, [...currentPlugged, card]);
+        // LÍMITE ESTRICTO: Solo permite hacer la mecánica de Enchufe 1 vez.
+        if (currentPlugged.length < 1) {
+            for (let i = 0; i < currentHand.length; i++) {
+                let card = currentHand[i];
+                for (let g = 0; g < currentTableGroups.length; g++) {
+                    let group = currentTableGroups[g];
+                    if (group.cards.length < 4 && isValidMelding([...group.cards, card])) {
+                        let remainingHand = [...currentHand]; remainingHand.splice(i, 1);
+                        let nextGroups = currentTableGroups.map((tg, idx) => { if (idx === g) return { ...tg, cards: [...tg.cards, card] }; return tg; });
+                        evaluate(remainingHand, nextGroups, currentFormedGroups, [...currentPlugged, card]);
+                    }
                 }
             }
         }
@@ -194,6 +196,7 @@ const getOptimalFinalScoreAndHand = (hand, exposedGroups) => {
     return { score: bestScore, orderedHand: bestArrangement }; 
 };
 
+// IA CORREGIDA PARA JOKERS (Prioriza llenar huecos internos primero)
 const inferJokers = (group) => {
     let jokers = group.filter(c => c.id.includes('Joker') && c.rank === 'Joker');
     let normals = group.filter(c => !(c.id.includes('Joker') && c.rank === 'Joker'));
@@ -213,10 +216,21 @@ const inferJokers = (group) => {
         }).sort((a,b)=>a-b);
         
         let missing = [];
-        let min = Math.max(1, nRanks[0] - jokers.length); 
-        let max = Math.min(14, nRanks[nRanks.length - 1] + jokers.length);
-        for(let i=min; i<=max; i++) { if(!nRanks.includes(i)) missing.push(i); }
+        // 1. Busca huecos internos (Ej: Entre el 5 y el 7)
+        for(let i = nRanks[0]; i <= nRanks[nRanks.length - 1]; i++) {
+            if(!nRanks.includes(i)) missing.push(i);
+        }
         
+        // 2. Si sobran jokers, expande a los lados
+        let down = nRanks[0] - 1;
+        let up = nRanks[nRanks.length - 1] + 1;
+        while (missing.length < jokers.length) {
+            if (down >= 1 && !missing.includes(down)) { missing.push(down); down--; }
+            else if (up <= 14 && !missing.includes(up)) { missing.push(up); up++; }
+            else break;
+        }
+
+        missing.sort((a,b)=>a-b);
         let rankMap = {11:'J', 12:'Q', 13:'K', 14:'A', 15:'2', 1:'A'};
         jokers.forEach((j, i) => {
             let val = missing[i] || 2; 
@@ -301,12 +315,13 @@ const executeBotPlay = (roomId, bot) => {
         io.to(roomId).emit('update_game', sanitizeRoom(room));
 
         setTimeout(() => {
-            // SE ELIMINÓ LA FASE DE "ENCHUFE DURANTE EL JUEGO" PARA EL BOT (AHORA ES 100% AUTOMATICO AL FINAL)
+            // El bot no hace enchufes manuales. El algoritmo final lo hace por él y no tirará su carta de enchufe.
 
             let finalOpt = getOptimalFinalScoreAndHand(bot.hand, room.exposedGroups);
             let cardToDiscard;
             
             if (bot.difficulty >= 2 && finalOpt.orderedHand.length > 0) {
+                // Al buscar solo las "dead" cards, se protege el "plug" card (el bot se la guarda automáticamente).
                 let deadCards = finalOpt.orderedHand.filter(c => c.role === 'dead');
                 if (deadCards.length > 0) { cardToDiscard = deadCards[0]; } else { cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)]; }
             } else { cardToDiscard = bot.hand[Math.floor(Math.random() * bot.hand.length)]; }
@@ -352,7 +367,6 @@ const forceGameOver = async (roomId, knockerId) => {
     room.players.forEach(p => { p.inLobby = p.isBot ? true : false; }); 
 
     const scores = room.players.map(p => {
-        // ENCHUFE AUTOMÁTICO INDEPENDIENTE SE CALCULA AQUÍ PERFECTAMENTE
         let opt = getOptimalFinalScoreAndHand(p.hand, room.exposedGroups);
         let finalScore = p.surrendered ? opt.score + 20 : opt.score;
         return { id: p.id, name: p.name, score: finalScore, character: p.character, finalHand: opt.orderedHand, turnDiff: 0, surrendered: p.surrendered };
@@ -597,6 +611,8 @@ io.on('connection', (socket) => {
         const cardIdx = player.hand.findIndex(c => c.id === cardId);
         if (cardIdx > -1) { const card = player.hand.splice(cardIdx, 1)[0]; room.discardPile.push(card); socket.emit('update_hand', player.hand); nextTurn(roomId); }
     });
+
+    // SE ELIMINARON LOS SOCKETS DE PLUG Y UNPLUG MANUAL PARA QUE NADIE ENCHUFE EN MEDIO DEL JUEGO
 
     socket.on('reorder_hand', ({ roomId, newOrder }) => {
         const room = rooms[roomId]; if (!room || room.state !== 'playing') return;
