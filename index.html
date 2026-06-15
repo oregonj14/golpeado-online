@@ -123,13 +123,18 @@
         .setting-item label { font-size: 11px; color: #a0a0b0; margin-bottom: 6px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;}
         .setting-item select, .setting-item button { margin:0; width: 100%; padding: 8px;}
 
-        /* --- ZONA DE MESA Y CARTAS (PREMIUM) --- */
+        /* --- ZONA DE MESA Y CARTAS --- */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; width: 100%; height: 100%; box-sizing: border-box; }
         
-        .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; max-width: 1100px; margin: 0 auto; z-index: 1; padding: 10px; box-sizing: border-box;}
+        /* CORRECCIÓN: Cero Overlaps. El wrapper usa flex-column para apilar a los avatares ARRIBA de la mesa de forma natural */
+        .poker-table-wrapper { 
+            flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; width: 100%; max-width: 1100px; 
+            margin: 0 auto; z-index: 1; padding: 10px; box-sizing: border-box; gap: 20px;
+        }
         
         .poker-table { 
-            width: 92%; max-width: 750px; height: 100%; max-height: 48vh; 
+            width: 92%; max-width: 750px; height: 100%; max-height: 40vh; 
             background: radial-gradient(circle at 50% 50%, #1c1938 0%, #0d0b1a 80%, #05050a 100%); 
             border: 10px solid #16152b; border-radius: 120px; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
@@ -151,14 +156,13 @@
         
         .deck-slot { border: 2px dashed rgba(255,0,255,0.4); display: flex; align-items: center; justify-content: center; font-weight: 800; color: rgba(255,0,255,0.6); font-size: 12px; letter-spacing: 1px;}
         
-        /* DISEÑO DE CARTAS PROFESIONAL (FLEXBOX CORREGIDO) */
         .card { 
             background-color: var(--card-bg) !important; color: #111 !important; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.1); 
             cursor: grab; position: relative; z-index: 10; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
             font-family: 'Arial', sans-serif; 
             user-select: none;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; /* ESTO CENTRA EL PALO GIGANTE */
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
         }
         
         .card-corner { position: absolute; display: flex; flex-direction: column; align-items: center; font-size: 13px; font-weight: 900; line-height: 1; }
@@ -206,11 +210,18 @@
         .animate-banner { animation: turnAnnounce 1.8s forwards; }
 
         .exposed-groups-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 15px; max-height: 12vh; overflow-y: auto; padding: 5px;}
-        .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 4px 6px; border-radius: 10px; border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: var(--transition); box-shadow: 0 5px 10px rgba(0,0,0,0.5);}
+        .exposed-group { display: inline-flex; background: rgba(0,0,0,0.5); padding: 4px 6px; border-radius: 10px; border: 1px solid rgba(255,0,255,0.4); transition: var(--transition); box-shadow: 0 5px 10px rgba(0,0,0,0.5);}
         .exposed-group:hover { border-color: var(--cyan-neon); box-shadow: 0 0 15px rgba(0,242,255,0.3), 0 5px 10px rgba(0,0,0,0.5); transform: translateY(-2px);}
         
-        .opponents-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 10; }
-        .avatar-seat { position: absolute; display: flex; flex-direction: column; align-items: center; pointer-events: auto; animation: floatAvatar 4s ease-in-out infinite;}
+        /* CORRECCIÓN: Los avatares ahora usan Flexbox dentro de un contenedor en la parte superior */
+        .opponents-container { 
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; 
+            width: 100%; pointer-events: auto; z-index: 10; position: relative;
+        }
+        .avatar-seat { 
+            position: relative; display: flex; flex-direction: column; align-items: center; 
+            animation: floatAvatar 4s ease-in-out infinite;
+        }
         
         @keyframes floatAvatar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         
@@ -301,9 +312,16 @@
 
         @media (max-width: 480px) {
             :root { --card-w: 12.5vw; --card-h: 18.5vw; }
-            .poker-table { max-height: 42vh; border-width: 6px; width: 98%; padding: 5px; border-radius: 100px;}
+            
+            /* Ajuste de Mesa y Contenedor en Celular */
+            .poker-table-wrapper { gap: 10px; padding-top: 5px; }
+            .poker-table { max-height: 40vh; border-width: 6px; width: 98%; padding: 5px; border-radius: 100px;}
             .card-back::after { font-size: max(16px, 4vw); }
-            .status-bar button { padding: 6px 10px; font-size: 11px;}
+            
+            /* Ajuste de botones Bottom Panel (Se envuelven correctamente) */
+            .status-container { flex-direction: column; width: 100%; gap: 6px; }
+            .status-bar { width: 100%; justify-content: space-between; padding: 6px;}
+            .status-bar button { padding: 8px 6px; font-size: 10px; flex: 1 1 auto; margin: 0 2px;}
             
             .avatar-icon { width: 32px; height: 32px; font-size: 16px; border-width: 1px;}
             .avatar-name { font-size: 9px; padding: 2px 5px; margin-top: -5px;}
@@ -312,10 +330,12 @@
             .exposed-group .card { transform: scale(0.58); margin: 0 -8px; } 
             .exposed-groups-container { max-height: 15vh; gap: 5px;}
 
-            .hand-container { min-height: 75px; gap: 3px;}
-            #chatBox { top: 70px; bottom: auto !important; right: 10px; width: 240px; }
-            #chatBox.minimized { width: 50px; height: 50px; }
-            #chatMessages { max-height: 110px; }
+            .hand-container { min-height: 70px; gap: 3px; padding-bottom: 5px;}
+            
+            /* Chat posicionado para no tapar la mano */
+            #chatBox { top: auto; bottom: 110px; right: 10px; width: 240px; }
+            #chatBox.minimized { width: 50px; height: 50px; bottom: 120px; }
+            #chatMessages { max-height: 100px; }
 
             .western-title { font-size: 2rem; }
             .modal-base { padding: 15px; }
@@ -407,7 +427,10 @@
     <div class="board hidden" id="gameBoard">
         <div class="poker-table-wrapper">
             <div class="next-turn-display">Próximo Turno:<br><strong id="nextTurnDisplay" style="color:var(--cyan-neon); font-size: 14px;">...</strong></div>
+            
+            <!-- CORRECCIÓN: Contenedor Flexbox para los oponentes arriba de la mesa -->
             <div class="opponents-container" id="opponentsArea"></div>
+            
             <div class="poker-table">
                 <div class="mat">
                     <div class="card-back" onclick="drawCard('deck')"><span id="deckCount" style="color:white; background:var(--magenta-neon); padding: 2px 6px; border-radius: 10px; font-size:10px; font-weight:800; position:absolute; bottom:-8px;">0</span></div>
@@ -849,16 +872,6 @@
             });
         });
 
-        function handleGroupClick(groupId) {
-            if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 1) { socket.emit('plug_card', { roomId: currentRoomId, groupId: groupId, cardId: selectedCards[0] }); selectedCards = []; }
-        }
-
-        function handleUnplug(groupId, cardId, event) {
-            event.stopPropagation(); if (!miTurno || currentPhase !== 'discard' || soyEspectador) return;
-            if (selectedCards.length === 0) socket.emit('unplug_card', { roomId: currentRoomId, groupId: groupId, cardId: cardId });
-        }
-
         function makeCardDraggable(el) {
             el.setAttribute('draggable', 'true');
             el.addEventListener('dragstart', () => { draggedElement = el; el.style.opacity = '0.4'; });
@@ -867,14 +880,6 @@
             el.addEventListener('touchstart', () => { draggedElement = el; el.style.opacity = '0.4'; }, { passive: true });
             el.addEventListener('touchmove', (e) => { if (!draggedElement) return; e.preventDefault(); const touch = e.touches[0]; const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.card'); if (target && target !== draggedElement && target.parentElement === document.getElementById('myHand')) { const cards = [...document.getElementById('myHand').children]; if (cards.indexOf(draggedElement) < cards.indexOf(target)) target.after(draggedElement); else target.before(draggedElement); } }, { passive: false });
             el.addEventListener('touchend', () => { if (draggedElement) { draggedElement.style.opacity = '1'; draggedElement = null; } const newOrder = [...document.getElementById('myHand').children].map(c => c.id); socket.emit('reorder_hand', { roomId: currentRoomId, newOrder }); });
-        }
-
-        function getSeatPosition(index, totalOthers) {
-            if (totalOthers === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' };
-            if (totalOthers === 2) { if (index === 0) return { top: '15%', left: '90%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '15%', left: '10%' }; }
-            if (totalOthers === 3) { if (index === 0) return { top: '35%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '5%', left: '50%', transform: 'translateX(-50%)' }; if (index === 2) return { top: '35%', left: '5%' }; }
-            if (totalOthers >= 4) { if (index === 0) return { top: '45%', left: '95%', transform: 'translateX(-100%)' }; if (index === 1) return { top: '10%', left: '80%', transform: 'translateX(-100%)' }; if (index === 2) return { top: '10%', left: '20%' }; if (index === 3) return { top: '45%', left: '5%' }; }
-            return { top: '0', left: '0' };
         }
 
         socket.on('update_game', (room) => {
@@ -888,9 +893,9 @@
             if (!soyEspectador) { const myIndex = room.players.findIndex(p => p.id === socket.id); for(let i=1; i < room.players.length; i++) { orderedOpponents.push(room.players[(myIndex + i) % room.players.length]); } } else { orderedOpponents = room.players; }
 
             orderedOpponents.forEach((p, index) => {
-                const pos = getSeatPosition(index, orderedOpponents.length); const isTurn = room.turnId === p.id;
+                const isTurn = room.turnId === p.id;
                 let avatarSymbol = p.offline ? '📡' : (p.character || '❓');
-                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}" style="top:${pos.top}; left:${pos.left}; ${pos.transform ? 'transform:'+pos.transform+';' : ''}"><div class="avatar-icon" style="${p.activeEffect}">${avatarSymbol}</div><div class="avatar-name" style="${p.activeEffect}">${p.name}</div></div>`;
+                oppArea.innerHTML += `<div class="avatar-seat ${isTurn ? 'active-turn' : ''}" id="avatar-${p.id}"><div class="avatar-icon" style="${p.activeEffect}">${avatarSymbol}</div><div class="avatar-name" style="${p.activeEffect}">${p.name}</div></div>`;
             });
 
             miTurno = (room.turnId === socket.id);
@@ -915,9 +920,10 @@
             const area = document.getElementById('exposedArea'); area.innerHTML = '';
             room.exposedGroups.forEach(g => {
                 let cardsHTML = ''; g.cards.forEach(c => { 
-                    cardsHTML += `<span onclick="handleUnplug('${g.id}', '${c.id}', event)">${generateCardHTML(c, '', 'display:inline-flex; transform:scale(0.8); margin:0 -5px;')}</span>`; 
+                    // SE ELIMINÓ EL EVENTO ONCLICK PARA NO PERMITIR ENCHUFAR/DESENCHUFAR MANUALMENTE
+                    cardsHTML += `<span>${generateCardHTML(c, '', 'display:inline-flex; transform:scale(0.8); margin:0 -5px;')}</span>`; 
                 });
-                area.innerHTML += `<div class="exposed-group" onclick="handleGroupClick('${g.id}')">${cardsHTML}</div>`;
+                area.innerHTML += `<div class="exposed-group">${cardsHTML}</div>`;
             });
         });
 
