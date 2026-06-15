@@ -407,7 +407,6 @@ const handleLeaveRoom = (socket, roomId, forceRemove = false) => {
             let removedId = player.id;
             room.players.splice(idx, 1);
             
-            // CORRECCIÓN: Si se va el Starter, reasignar al primero que quede
             if (room.startingPlayerId === removedId && room.players.length > 0) {
                 room.startingPlayerId = room.players[0].id;
             }
