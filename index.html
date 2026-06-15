@@ -46,13 +46,19 @@
             font-size: 2.5rem; margin: 15px 0; letter-spacing: 2px;
         }
 
+        /* CORRECCIÓN: Animación para contenedores estáticos (evita que se vayan a la esquina superior izquierda) */
+        @keyframes fadeSlideUp {
+            from { transform: translateY(40px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         .container { 
-            max-width: 600px; margin: 2vh auto; 
+            max-width: 600px; margin: auto; /* Centrado perfecto vertical y horizontal */
             background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             padding: 25px; border-radius: 24px; border: 1px solid var(--border-glass); 
             box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05); 
             width: 90%; max-height: 90dvh; overflow-y: auto; 
-            animation: slideInUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            animation: fadeSlideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
         
         input, select, button { 
@@ -121,7 +127,9 @@
 
         /* --- ZONA DE MESA Y CARTAS (PREMIUM) --- */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; width: 100%; height: 100%; box-sizing: border-box; }
-        .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; z-index: 1; padding: 10px; box-sizing: border-box;}
+        
+        /* CORRECCIÓN PC: Limitar el ancho en PC para que no se deforme la mesa ni se separen los avatares */
+        .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; max-width: 1100px; margin: 0 auto; z-index: 1; padding: 10px; box-sizing: border-box;}
         
         .poker-table { 
             width: 92%; max-width: 750px; height: 100%; max-height: 48vh; 
@@ -235,7 +243,7 @@
         #localAvatarArea.active-turn .avatar-icon { animation: pulseActiveTurn 1.5s infinite; }
         #localAvatarArea .avatar-name { background: none; border: none; padding: 0; font-size: 13px; margin: 0; color: white; font-weight: 800; }
         
-        .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 10px 5px; min-height: 95px; width: 98%; max-width: 850px; perspective: 1000px;}
+        .hand-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 10px 5px; min-height: 95px; width: 98%; max-width: 1000px; margin: 0 auto; perspective: 1000px;}
 
         /* CHAT MEJORADO */
         #chatBox { position: fixed; right: 20px; bottom: 20px; width: 280px; background: rgba(10, 8, 20, 0.95); border: 1px solid var(--cyan-neon); border-radius: 16px; z-index: 9999; display: flex; flex-direction: column; padding: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(10px); transition: var(--transition);}
@@ -257,8 +265,11 @@
         .emote-btn { background: rgba(0,0,0,0.5); border: 1px solid var(--border-glass); border-radius: 8px; padding: 6px; font-size: 18px; cursor: pointer; flex: 1; margin:0; color: white; transition: transform 0.2s;}
         .emote-btn:hover { transform: scale(1.15); border-color: var(--cyan-neon); background: rgba(0,242,255,0.1);}
 
-        /* MODALES */
-        @keyframes slideInUp { from { transform: translate(-50%, 50px); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+        /* CORRECCIÓN PC: MODALES ABSOLUTOS CENTRADOS CORRECTAMENTE */
+        @keyframes modalSlideIn {
+            from { transform: translate(-50%, calc(-50% + 50px)); opacity: 0; }
+            to { transform: translate(-50%, -50%); opacity: 1; }
+        }
         
         .modal-base {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -267,11 +278,15 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(0,242,255,0.1);
             border-radius: 24px; padding: 20px; z-index: 10000;
             width: 92%; max-width: 550px; max-height: 85dvh; display: flex; flex-direction: column; box-sizing: border-box;
-            animation: slideInUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
-        #jokerModal { top: auto; bottom: 15%; transform: translateX(-50%); animation: slideInUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes slideInUpBottom { from { transform: translate(-50%, 50px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        @keyframes jokerSlideIn {
+            from { transform: translate(-50%, 50px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        #jokerModal { top: auto; bottom: 10%; transform: translateX(-50%); animation: jokerSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
         .joker-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
         .joker-btn { background: rgba(0,0,0,0.5); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: white; cursor: pointer; font-weight: 800; width: auto; margin:0;}
@@ -610,7 +625,7 @@
                 setTimeout(() => {
                     socket.emit('discard', { roomId: currentRoomId, cardId: cardId }); 
                     selectedCards = [];
-                }, 300); // Dar tiempo a la animación
+                }, 300); 
             } else { socket.emit('knock', currentRoomId); }
         }
 
@@ -819,7 +834,6 @@
         });
 
         socket.on('update_hand', (hand) => {
-            // Diferenciador para saber si son cartas nuevas que robamos
             const isNewDraw = hand.length > myHandData.length;
             const newCardId = isNewDraw ? hand[hand.length - 1].id : null;
             
@@ -830,7 +844,6 @@
                 let extraClass = (c.id === newCardId) ? 'card-entering' : '';
                 container.innerHTML += generateCardHTML(c, extraClass, '', false, false);
             });
-            // Re-bind events
             [...container.children].forEach(cardDiv => {
                 cardDiv.onclick = () => handleCardClick(cardDiv.id);
                 makeCardDraggable(cardDiv);
@@ -883,11 +896,10 @@
 
             miTurno = (room.turnId === socket.id);
             
-            // ANIMACIÓN DE TURNO ÉPICA
             if (miTurno && !turnWasMine) {
                 const banner = document.getElementById('turnBanner');
                 banner.classList.remove('hidden', 'animate-banner');
-                void banner.offsetWidth; // trigger reflow
+                void banner.offsetWidth; 
                 banner.classList.add('animate-banner');
             }
             turnWasMine = miTurno;
