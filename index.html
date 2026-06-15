@@ -32,7 +32,6 @@
             position: relative;
         }
 
-        /* EFECTO DE PARTICULAS FLOTANTES DE FONDO */
         body::before {
             content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
             background: radial-gradient(circle at 50% 50%, rgba(0, 242, 255, 0.05) 0%, transparent 60%),
@@ -46,14 +45,13 @@
             font-size: 2.5rem; margin: 15px 0; letter-spacing: 2px;
         }
 
-        /* CORRECCIÓN: Animación para contenedores estáticos (evita que se vayan a la esquina superior izquierda) */
         @keyframes fadeSlideUp {
             from { transform: translateY(40px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
 
         .container { 
-            max-width: 600px; margin: auto; /* Centrado perfecto vertical y horizontal */
+            max-width: 600px; margin: auto; 
             background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             padding: 25px; border-radius: 24px; border: 1px solid var(--border-glass); 
             box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05); 
@@ -111,7 +109,7 @@
 
         .room-item { background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; transition: var(--transition);}
         .room-item:hover { background: rgba(0, 242, 255, 0.05); border-color: var(--cyan-neon); transform: translateX(5px);}
-        .room-item button { width: auto; margin: 0; padding: 6px 18px; border-radius: 8px; font-size: 12px;}
+        .room-item button { width: auto; margin: 0; border-radius: 8px; font-size: 12px;}
         
         .player-list-item { 
             background: rgba(0,0,0,0.5); border-left: 4px solid var(--cyan-neon); 
@@ -128,7 +126,6 @@
         /* --- ZONA DE MESA Y CARTAS (PREMIUM) --- */
         .board { display: flex; flex-direction: column; justify-content: space-between; flex: 1; position: relative; width: 100%; height: 100%; box-sizing: border-box; }
         
-        /* CORRECCIÓN PC: Limitar el ancho en PC para que no se deforme la mesa ni se separen los avatares */
         .poker-table-wrapper { flex: 1; min-height: 0; position: relative; display: flex; justify-content: center; align-items: center; width: 100%; max-width: 1100px; margin: 0 auto; z-index: 1; padding: 10px; box-sizing: border-box;}
         
         .poker-table { 
@@ -154,20 +151,21 @@
         
         .deck-slot { border: 2px dashed rgba(255,0,255,0.4); display: flex; align-items: center; justify-content: center; font-weight: 800; color: rgba(255,0,255,0.6); font-size: 12px; letter-spacing: 1px;}
         
-        /* DISEÑO DE CARTAS PROFESIONAL */
+        /* DISEÑO DE CARTAS PROFESIONAL (FLEXBOX CORREGIDO) */
         .card { 
             background-color: var(--card-bg) !important; color: #111 !important; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.1); 
             cursor: grab; position: relative; z-index: 10; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
-            font-family: 'Arial', sans-serif; /* Mejor para simbolos */
+            font-family: 'Arial', sans-serif; 
             user-select: none;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; /* ESTO CENTRA EL PALO GIGANTE */
         }
         
         .card-corner { position: absolute; display: flex; flex-direction: column; align-items: center; font-size: 13px; font-weight: 900; line-height: 1; }
         .top-left { top: 4px; left: 4px; }
         .bottom-right { bottom: 4px; right: 4px; transform: rotate(180deg); }
         .suit-small { font-size: 11px; margin-top: 1px; }
-        .card-center.big-suit { display: flex; justify-content: center; align-items: center; height: 100%; font-size: 32px; }
+        .card-center.big-suit { display: flex; justify-content: center; align-items: center; height: 100%; font-size: 32px; width: 100%; }
 
         .card:hover, .card:active { z-index: 100 !important; cursor: grabbing; transform: scale(1.15) translateY(-15px); box-shadow: 0 15px 25px rgba(0,0,0,0.6); }
         .card.selected { 
@@ -181,7 +179,6 @@
             border: 2px solid #9b59b6; 
         }
 
-        /* ANIMACIONES ÉPICAS */
         @keyframes drawCardAnim { 
             0% { transform: translate(0, -200px) scale(0.2) rotate(-30deg); opacity: 0; filter: blur(4px); } 
             70% { transform: translate(0, -20px) scale(1.1) rotate(5deg); opacity: 1; filter: blur(0); }
@@ -265,7 +262,6 @@
         .emote-btn { background: rgba(0,0,0,0.5); border: 1px solid var(--border-glass); border-radius: 8px; padding: 6px; font-size: 18px; cursor: pointer; flex: 1; margin:0; color: white; transition: transform 0.2s;}
         .emote-btn:hover { transform: scale(1.15); border-color: var(--cyan-neon); background: rgba(0,242,255,0.1);}
 
-        /* CORRECCIÓN PC: MODALES ABSOLUTOS CENTRADOS CORRECTAMENTE */
         @keyframes modalSlideIn {
             from { transform: translate(-50%, calc(-50% + 50px)); opacity: 0; }
             to { transform: translate(-50%, -50%); opacity: 1; }
@@ -328,7 +324,6 @@
 </head>
 <body>
 
-    <!-- OVERLAY TURNO -->
     <div id="turnBanner" class="turn-banner hidden">¡TU TURNO!</div>
 
     <div class="container" id="authScreen">
@@ -585,6 +580,10 @@
         function createRoom() { socket.emit('create_room', { name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
         function joinRoom() { const c = document.getElementById('roomCode').value.trim(); if(c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); } }
         function joinSpecificRoom(id) { currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect }); }
+        
+        // MODO ESPECTADOR
+        function spectateRoom(id) { currentRoomId = id; socket.emit('join_room', { roomId: id, name: loggedUser.username, activeEffect: loggedUser.activeEffect, asSpectator: true }); }
+        function spectateRoomManual() { const c = document.getElementById('roomCode').value.trim(); if(c) { currentRoomId = c; socket.emit('join_room', { roomId: c, name: loggedUser.username, activeEffect: loggedUser.activeEffect, asSpectator: true }); } }
 
         function joinAsPlayer() { socket.emit('join_as_player', currentRoomId); }
 
@@ -968,7 +967,7 @@
         });
         function sendChat(msg) { socket.emit('send_chat', { roomId: currentRoomId, msg }); }
         function sendTypedChat() { const i = document.getElementById('chatInput'); if(i.value.trim()){ socket.emit('send_chat', { roomId: currentRoomId, msg: i.value.trim() }); i.value = ''; } }
-        socket.on('update_public_rooms', (rooms) => { document.getElementById('publicRoomsList').innerHTML = rooms.map(r => `<div class="room-item"><span><strong style="color:var(--cyan-neon);">Mesa ${r.id}</strong> (${r.players}/${r.max})</span><button onclick="joinSpecificRoom('${r.id}')" style="background:rgba(0,242,255,0.1);">Entrar</button></div>`).join(''); });
+        socket.on('update_public_rooms', (rooms) => { document.getElementById('publicRoomsList').innerHTML = rooms.map(r => `<div class="room-item"><span><strong style="color:var(--cyan-neon);">Mesa ${r.id}</strong> (${r.players}/${r.max})</span><div style="display:flex; gap:5px;"><button onclick="joinSpecificRoom('${r.id}')" style="background:rgba(0,242,255,0.1); padding:6px 12px;">Jugar</button><button onclick="spectateRoom('${r.id}')" style="background:rgba(255,0,255,0.1); border-color:var(--magenta-neon); color:var(--magenta-neon); padding:6px 10px;" title="Entrar como espectador">👀</button></div></div>`).join(''); });
         socket.on('error_msg', (msg) => { alert(msg); selectedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected')); document.getElementById('discardKnockBtn').innerText = "¡GOLPE!"; });
     </script>
 </body>
